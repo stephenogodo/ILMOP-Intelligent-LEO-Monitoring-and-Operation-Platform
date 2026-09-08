@@ -1,0 +1,66 @@
+# ── Virtual environments ──────────────────────────────────────────────────────
+.venv/
+.venv-1/
+.venv-*/
+venv/
+env/
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.Python
+
+# ── Environment variables (never commit secrets) ──────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Generated telemetry data (large, re-generatable) ─────────────────────────
+data/telemetry/*.csv
+
+# ── MLflow artifacts (Sprint 5+) ──────────────────────────────────────────────
+mlruns/
+mlartifacts/
+*.mlmodel
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Operating system ──────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Archives ──────────────────────────────────────────────────────────────────
+*.zip
+*.tar.gz
+
+# ── Office temp files ─────────────────────────────────────────────────────────
+~$*.docx
+~$*.xlsx
+~$*.pptx
+~*.tmp
+*.txt
+
+# ── pytest cache ──────────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
