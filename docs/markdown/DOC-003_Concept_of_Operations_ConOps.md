@@ -299,9 +299,15 @@ this parameter.
 | Contact frequency | One pass per ~95 minutes per ground station |
 | Contact duration | 5–10 minutes per pass |
 | ML model | LEO_CIRCULAR baseline — trained on Scenario 1 data as initial model |
-| Primary purpose | Pipeline validation; anomaly detection baseline training; communication and navigation demonstration baseline |
+| Primary purpose | Pipeline validation; anomaly detection baseline training; communication demonstration baseline |
 
-Scenario 1 is the operational baseline from which all subsequent scenarios are extensions. It establishes the telemetry pattern — regular eclipse cycling, battery charge and discharge with the orbital period, thermal oscillation — that the anomaly detection model learns as normal. Any operational scenario involving a single satellite, whether for initial platform testing, PhD communication demonstration, or baseline model training, uses Scenario 1.
+Scenario 1 is the operational baseline from which all subsequent
+scenarios are extensions. It establishes the telemetry pattern —
+regular eclipse cycling, battery charge and discharge with the orbital
+period, thermal oscillation — that the anomaly detection model learns
+as normal. Any operational scenario involving a single satellite, whether
+for initial platform testing, PhD communication demonstration, or baseline
+model training, uses Scenario 1.
 
 ### 6.2 Scenario 2 — Single-plane LEO constellation (6 satellites)
 
@@ -311,14 +317,20 @@ Scenario 1 is the operational baseline from which all subsequent scenarios are e
 | Orbit type | LEO circular, 550 km, 53° inclination |
 | Plane configuration | 1 orbital plane, RAAN = 45°, satellites spaced 60° in mean anomaly |
 | Contact frequency | One pass per ~16 minutes per ground station (6× improvement over Scenario 1) |
-| Simultaneous visibility | Up to 2 satellites visible from a mid-latitude station at any moment |
+| Simultaneous visibility | Typically 1 satellite per pass; brief dual-satellite overlap (~5 min) when consecutive satellites share the visibility window. Geometry insufficient for GPS-style simultaneous trilateration — see Scenario 3. |
 | ML model | LEO_CIRCULAR model extended with 6-satellite training data |
 | Primary purpose | Navigation demonstration; contact frequency improvement; multi-satellite coordination |
 
-With six satellites spaced 60° apart in a single orbital plane, the 37° ground visibility arc at 550 km altitude means 1–2 satellites are visible per pass window. The navigation demonstration uses Doppler shift and ranging measurements accumulated across sequential satellite passes to demonstrate the OFDM waveform's navigation capability — consistent with the LEO Doppler navigation heritage of the TRANSIT system but using a modern integrated OFDM signal design.
-
-The navigation validation pipeline compares the OFDM position fix against the HPOP NavigationTruthModel (1–10 metre accuracy) rather than against SGP4 (100–500 metre accuracy). Claiming sub-100-metre navigation accuracy against a 300-metre truth reference is not scientifically
-defensible. The HPOP model is invoked only for navigation validation, not for routine operational orbit computation.
+Scenario 2 supports two navigation demonstration modes that exploit its
+higher contact frequency (one pass per ~16 minutes instead of ~95
+minutes): Doppler-based ranging from individual passes, and sequential
+accumulated ranging across multiple successive passes within a short
+observation window. With satellites spaced 60° apart, the 37° ground
+visibility arc at 550 km altitude means only 1–2 satellites are
+simultaneously visible — insufficient for GPS-style trilateration, which
+requires 4+ satellites distributed across different azimuths.
+Simultaneous multi-satellite trilateration is demonstrated in Scenario 3,
+where four planes at different RAANs place satellites across the full sky.
 
 ### 6.3 Scenario 3 — Multi-plane LEO constellation (24 satellites, 4 × 6)
 
@@ -624,38 +636,82 @@ contact window (`in_contact = True`), logging the link quality
 parameters (downlink and uplink rates), and providing the mission
 operations context in which the demonstration occurs.
 
-### 11.2 Navigation demonstration (Scenario 2)
+### 11.2 Navigation demonstration (Scenarios 1, 2, and 3)
 
-The navigation demonstration requires Scenario 2: six satellites in
-a single orbital plane, providing simultaneous visibility of four or
-more satellites from the demonstration receiver — the minimum geometry
-for three-dimensional trilateration.
+The OFDM waveform navigation capability is demonstrated progressively
+across three constellation scenarios, each supporting a different
+navigation mode of increasing geometric complexity. This mirrors the
+historical development of satellite navigation — from single-satellite
+Doppler systems (TRANSIT, 1964) through multi-satellite GPS — while
+demonstrating a modern integrated OFDM ISAC implementation.
 
-The operational procedure is:
+#### Navigation mode 1 — Doppler ranging (Scenario 1: single satellite)
 
-1. Start Scenario 2 to confirm all 6 satellites are generating telemetry
-   and the constellation is operating correctly.
-2. Identify a time window when 4 or more satellites are simultaneously
-   above the receiver's horizon (elevation > 5°). The dashboard's
-   simultaneous visibility counter (Sprint 6) supports this selection.
-3. During the selected window, the OFDM waveform measures the timing
-   offset (pseudo-range) from each visible satellite. The waveform's
-   signal processing pipeline produces a position fix.
-4. The NavigationTruthModel (poliastro HPOP, Sprint 6) computes the
-   precise position of each satellite at the measurement epoch, with
-   1–10 metre accuracy. This is the truth reference.
-5. The navigation residual — the difference between the OFDM position
-   fix and the HPOP truth — is logged to TimescaleDB via the navigation
-   validation pipeline and accessible via `GET /navigation/{sat}/residuals`.
-6. The GDOP is computed from the satellite positions and logged alongside
-   the residual.
+A single LEO satellite pass produces a characteristic Doppler frequency
+shift as the satellite approaches, passes overhead, and recedes. The
+OFDM waveform measures this shift continuously across the pass. From
+the Doppler curve and the known satellite orbit, a 2D position fix
+(latitude and longitude) is derived — the operational principle of the
+TRANSIT system, here demonstrated with a modern ISAC waveform.
 
-The use of HPOP rather than SGP4 as the truth reference is operationally
-essential. SGP4 positional errors of 100–500 metres would make it
-impossible to validate navigation claims below 200 metres — the truth
-reference error would dominate the residual. The HPOP model's 1–10 metre
-accuracy ensures that the residual reflects waveform performance rather
-than reference error.
+Procedure:
+
+1. Run Scenario 1; identify a pass with elevation above 20°.
+2. Record the Doppler frequency shift across the full pass duration.
+3. Apply the Doppler navigation algorithm to derive a 2D position fix.
+4. Compare against NavigationTruthModel (poliastro HPOP, 1–10 m accuracy).
+5. Log position residual and pass geometry to TimescaleDB.
+
+#### Navigation mode 2 — Sequential accumulated ranging (Scenario 2: 6 satellites, single plane)
+
+With six satellites, a pass arrives every ~16 minutes. Ranging
+measurements are accumulated across multiple successive passes within a
+1–2 hour observation window. Satellite positions change between passes,
+providing geometric diversity over time that enables a 3D position fix
+from accumulated pseudoranges even though only 1–2 satellites are
+visible at any single moment.
+
+Procedure:
+
+1. Run Scenario 2; select a 2-hour observation window.
+2. For each satellite pass, measure the pseudorange using the OFDM waveform.
+3. Accumulate pseudoranges — each pass adds one equation with a different satellite geometry.
+4. Solve the accumulated pseudorange system for a 3D position fix.
+5. Validate against NavigationTruthModel; compute position residual RMS.
+
+#### Navigation mode 3 — Simultaneous multi-satellite trilateration (Scenario 3: 24 satellites, 4 planes)
+
+The four-plane constellation places satellites at RAANs of 0°, 90°,
+180°, and 270°, meaning satellites arrive from four different azimuth
+directions around the horizon. At any given moment, 4 or more satellites
+from different planes are visible simultaneously and distributed across
+the sky — the geometry required for GPS-style 3D trilateration with
+good GDOP. This is the closest analogue to operational GNSS demonstrated
+by ILMOP.
+
+Procedure:
+
+1. Run Scenario 3; use the dashboard simultaneous visibility counter
+   (Sprint 6) to identify a window with 4+ satellites visible from
+   different azimuth directions (elevation > 5°).
+2. Simultaneously measure the pseudorange to each visible satellite
+   using the OFDM waveform.
+3. Solve the pseudorange system for a 3D position fix.
+4. NavigationTruthModel (poliastro HPOP) provides satellite positions
+   to 1–10 metre accuracy — the truth reference.
+5. Log the navigation residual via `GET /navigation/{sat}/residuals`.
+   Compute GDOP alongside — low GDOP confirms geometric quality;
+   high GDOP explains larger residuals without invalidating the waveform.
+
+#### Why HPOP rather than SGP4 as the truth reference (all modes)
+
+SGP4 positional errors of 100–500 metres make it impossible to validate
+navigation claims below 200 metres — the truth reference error dominates
+the residual. The HPOP NavigationTruthModel (1–10 metre accuracy)
+ensures the residual reflects waveform performance, not reference error.
+This is essential for peer-review credibility. SGP4 is retained for all
+operational purposes (contact scheduling, eclipse detection, simulation);
+only the navigation truth reference uses HPOP.
 
 ### 11.3 Remote sensing demonstration (Scenarios 3 and 4)
 
@@ -778,10 +834,8 @@ resolved in future sprints but deliberate architectural decisions:
    training data, provided those anomalies represent meaningful deviations
    from the eclipse-correlated normal baseline.
 
-4. LEO and Molniya HEO telemetry signatures are sufficiently different
-   that training a single model on both data types would produce a baseline
-   suitable for neither. This assumption motivates the `orbit_type`
-   separation architecture.
+4. LEO and Molniya HEO telemetry signatures are sufficiently different that training a single model on both data types would produce a baseline
+   suitable for neither. This assumption motivates the `orbit_type` separation architecture.
 
 5. The HPOP NavigationTruthModel (poliastro with EGM2008 + NRLMSISE-00)
    achieves 1–10 metre positional accuracy for LEO circular orbits over
@@ -868,3 +922,92 @@ resolved in future sprints but deliberate architectural decisions:
 *— End of Document —*
 
 *DOC-003 | ILMOP Concept of Operations | Version 1.0 | 2026-09-08*
+
+---
+
+## 16. Telemetry Continuity and Contact Window Behaviour
+
+### 16.1 What happens to telemetry between contact windows
+
+In a real LEO spacecraft, the onboard computer generates telemetry
+continuously at all times — regardless of whether a ground station is
+in range. This data is stored in onboard mass memory (a solid-state
+recorder) as **stored telemetry**. When a contact window opens, two
+streams flow simultaneously to the ground:
+
+- **Real-time telemetry** — the current state of the spacecraft, streamed live
+- **Stored telemetry dump** — the full history since the last contact, filling the inter-pass gap
+
+The ground segment reconstructs a complete, uninterrupted timeline
+across the full orbital period. No telemetry is lost between passes.
+
+### 16.2 How ILMOP models this
+
+ILMOP's simulator runs on the ground and generates telemetry at 1 Hz
+continuously. Every record is published to Kafka and written to
+TimescaleDB regardless of the `in_contact` flag. The `in_contact`
+field is a **status indicator** — it models the satellite's operational
+contact state; it does not gate the telemetry flow to the pipeline.
+
+```
+in_contact = True  →  telemetry flows to Kafka and TimescaleDB (continuous)
+in_contact = False →  telemetry flows to Kafka and TimescaleDB (continuous)
+```
+
+This is correct and intentional for two reasons:
+
+**The simulator is not an onboard system.** It runs on a development
+machine, not a satellite 550 km overhead. There is no radio link and
+no concept of data that cannot be received because the satellite is out
+of range. The `in_contact` flag simulates the operational state of the
+satellite — its link modes and rates — not a physical RF gate.
+
+**Between-pass telemetry is essential for AI/ML training.** The most
+significant anomaly patterns occur between contact windows: battery
+draining faster than expected during eclipse, temperature failing to
+recover in sunlight. Training only on the ~10% of telemetry generated
+during contact windows produces a model blind to the physics it most
+needs to detect.
+
+The contact state is correctly represented in the telemetry fields:
+
+| Field | During contact | Out of contact |
+|---|---|---|
+| `in_contact` | `True` | `False` |
+| `downlink_rate_mbps` | ~120 Mbps | 0.0 |
+| `uplink_rate_mbps` | ~20 Mbps | 0.0 |
+| `cpu_utilization_pct` | Elevated (downlink encoding) | Baseline |
+
+### 16.3 Known limitation — stored telemetry latency not modelled
+
+In a production deployment, telemetry received at the start of a
+contact window is already up to 90 minutes old — generated during the
+previous non-contact period and stored onboard until the pass. An
+anomaly that occurred 45 minutes ago is only discovered when the next
+contact window opens and the stored dump arrives.
+
+ILMOP does not currently model this **stored telemetry latency**. The
+anomaly detection service operates on a continuous 1 Hz stream rather
+than bursts of stored data arriving at each contact window. This does
+not affect the validity of the simulation results — the complete
+timeline is always available for training and validation. It is a known
+gap relative to production operations and is noted here for completeness.
+
+**Note for publications** (Papers 2 and 3): include the following
+statement in the methodology section to pre-empt reviewer questions:
+
+> *"The simulator generates telemetry continuously at 1 Hz across all
+> orbital phases. The `in_contact` flag and associated link rate fields
+> model the satellite's contact state without gating the telemetry flow
+> to the ground processing pipeline, consistent with the physical
+> behaviour of a real spacecraft where onboard data recorders preserve
+> telemetry across non-contact periods for downlink during the next
+> pass. The current implementation does not model stored telemetry
+> latency; in a production deployment, the anomaly detection service
+> would operate on telemetry arriving in bursts at contact time rather
+> than as a continuous stream."*
+
+---
+
+*Document version: 1.1 — Sections 16 added; Sections 6.2 and 11.2 corrected (navigation geometry)*
+*Previous version: 1.0 — initial ConOps*
