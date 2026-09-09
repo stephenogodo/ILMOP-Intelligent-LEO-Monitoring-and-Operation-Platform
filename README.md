@@ -8,24 +8,42 @@
   <img src="https://img.shields.io/badge/licence-MIT-lightgrey" alt="licence"/>
 </p>
 
-ILMOP is a full-stack, production-grade Mission Operations System (MOS) for Low Earth Orbit (LEO) satellite constellations, built from first
-principles in Python. It demonstrates the complete operational chain of modern commercial satellite operations: physics-accurate spacecraft
-simulation, real-time event streaming, time-series persistence, REST API delivery, and AI-assisted anomaly detection — all running as independent, loosely coupled microservices connected by an Apache Kafka event backbone.
+ILMOP is a full-stack, production-grade Mission Operations System (MOS)
+for Low Earth Orbit (LEO) satellite constellations, built from first
+principles in Python. It demonstrates the complete operational chain of
+modern commercial satellite operations: physics-accurate spacecraft
+simulation, real-time event streaming, time-series persistence, REST API
+delivery, and AI-assisted anomaly detection — all running as independent,
+loosely coupled microservices connected by an Apache Kafka event backbone.
 
 The platform is simultaneously a **software engineering portfolio project**
-demonstrating scalable cloud-native architecture, a **research instrument** providing the operational ground segment for a PhD programme in OFDM
-waveform design for Integrated Satellite Communication, Navigation, and Remote Sensing (ISAC), and a **progressive scalability demonstration**
-showing the same architecture handling one satellite through a 24-satellite multi-plane constellation without structural change.
+demonstrating scalable cloud-native architecture, a **research instrument**
+providing the operational ground segment for a PhD programme in OFDM
+waveform design for Integrated Satellite Communication, Navigation, and
+Remote Sensing (ISAC), and a **progressive scalability demonstration**
+showing the same architecture handling one satellite through a
+24-satellite multi-plane constellation without structural change.
 
 ---
 
 ## Why this project exists
 
-Modern commercial LEO constellations — communications networks, Earth observation fleets, IoT coverage platforms — require ground software architectures that are fundamentally different from the monolithic, point-to-point systems designed for legacy GEO satellites.
-A constellation of 24 satellites generating telemetry at 1 Hz produces 86,400 records per satellite per day, across 24 satellites, requiring real-time anomaly detection and automated scheduling decisions that no
+Modern commercial LEO constellations — communications networks,
+Earth observation fleets, IoT coverage platforms — require ground
+software architectures that are fundamentally different from the
+monolithic, point-to-point systems designed for legacy GEO satellites.
+A constellation of 24 satellites generating telemetry at 1 Hz produces
+86,400 records per satellite per day, across 24 satellites, requiring
+real-time anomaly detection and automated scheduling decisions that no
 team of operators can make manually at that rate.
 
-ILMOP is built around this problem. Every architectural decision — Kafka over point-to-point messaging, TimescaleDB over plain PostgreSQL, SGP4 orbit propagation with eclipse-aware physics, Isolation Forest anomaly detection trained on physically correlated telemetry — is driven by the operational realities of LEO constellation management, not by tutorial convenience. All decisions are documented with full rationale and alternatives considered in the Architecture Decision Record (ADR)
+ILMOP is built around this problem. Every architectural decision — Kafka
+over point-to-point messaging, TimescaleDB over plain PostgreSQL, SGP4
+orbit propagation with eclipse-aware physics, Isolation Forest anomaly
+detection trained on physically correlated telemetry — is driven by the
+operational realities of LEO constellation management, not by tutorial
+convenience. All decisions are documented with full rationale and
+alternatives considered in the Architecture Decision Record (ADR)
 register in `docs/adr/`.
 
 ---
@@ -117,11 +135,13 @@ training dataset. Eclipse fraction ~33% per 95.5-minute orbit.
 ### Scenario 2 — Single-plane LEO constellation (6 satellites)
 Six satellites equally spaced in one orbital plane. Contact frequency
 increases from one pass per ~95 minutes (Scenario 1) to one pass per
-~16 minutes. This is the geometry required for the PhD navigation
-demonstration: four or more simultaneously visible satellites at
-different angular positions provide the trilateration geometry for an
-OFDM-based position fix, directly analogous to GPS but using a
-purpose-designed integrated waveform.
+~16 minutes. With 60° satellite spacing and a 37° ground visibility
+arc at 550 km, only 1–2 satellites are visible simultaneously —
+insufficient for GPS-style trilateration. Scenario 2 demonstrates
+Doppler-based navigation (single-pass) and sequential accumulated
+ranging across multiple passes within a short observation window.
+GPS-style simultaneous multi-satellite trilateration is demonstrated
+in Scenario 3 where four planes distribute satellites across the sky.
 
 ### Scenario 3 — Multi-plane LEO constellation (24 satellites, 4 × 6)
 Four orbital planes, 90° RAAN separation, six satellites per plane.
@@ -192,6 +212,18 @@ trending higher during contact (active downlink processing). Replaced in
 Sprint 7 by a geometry-driven ILP scheduler computing actual contact
 windows from orbital mechanics and ground station coordinates.
 
+**Telemetry continuity:** The simulator generates telemetry continuously
+at 1 Hz regardless of the `in_contact` flag. The flag models the
+satellite's link state — it does not gate the data flow. This mirrors
+real spacecraft behaviour: onboard solid-state recorders store telemetry
+across non-contact periods (~90% of the orbit) for downlink at the next
+pass. All telemetry flows into Kafka and TimescaleDB continuously,
+ensuring the anomaly detection model trains on the full orbital physics,
+not just the ~10% of data generated during contact windows. Note: stored
+telemetry latency (anomalies discoverable only at the next contact
+window) is a known gap relative to production operations — documented
+in the ConOps Section 16.
+
 ---
 
 ## Telemetry schema (v2.0)
@@ -235,7 +267,7 @@ The mapping between ILMOP scenarios and PhD demonstrations:
 | ILMOP scenario | PhD demonstration | Why |
 |---|---|---|
 | Scenario 1 | Communication | Point-to-point link baseline |
-| Scenario 2 | Navigation | 6-satellite geometry for OFDM trilateration; SGP4 orbital truth for residual validation |
+| Scenario 2 | Navigation (Doppler + sequential) | Higher contact frequency; Doppler ranging per pass and accumulated multi-pass positioning |
 | Scenario 3 | Remote sensing (mid-latitude) | Multiple passes per day, coverage geometry |
 | Scenario 4 | Remote sensing (polar) | Molniya apogee dwell gives extended observation over fixed polar target |
 
