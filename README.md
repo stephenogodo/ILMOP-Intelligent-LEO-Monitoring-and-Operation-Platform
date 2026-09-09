@@ -283,11 +283,13 @@ claiming sub-100-metre navigation accuracy against a 300-metre truth
 reference is not defensible. The paper states this explicitly and
 documents the error budget of both models.
 
-\---
+
 
 \## Research outputs
 
-&#x20;  ILMOP supports an active research programme. Publications arising from this work will be listed here upon acceptance.
+&#x20;  ILMOP supports an active research programme. 
+
+&#x20;  Publications arising from this work will be listed here upon acceptance.
 
 
 
