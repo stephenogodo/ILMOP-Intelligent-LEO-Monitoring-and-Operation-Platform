@@ -1,6 +1,6 @@
 # ILMOP Architecture Design Document (ADD)
 **Document ID:** DOC-007
-**Version:** 0.3.0 (reflects Sprint 1–3 implementation)
+**Version:** 0.4.0 (reflects Sprint 1–4 implementation)
 **Status:** Active — updated each sprint
 **Last updated:** 2026-08-25
 
@@ -40,8 +40,8 @@ executes operational responses within defined autonomous boundaries.
 | Streaming | Kafka producer and consumer | ✅ Complete |
 | Storage | TimescaleDB sink + schema | ✅ Complete |
 | Configuration | `shared/config.py` (pydantic-settings) | ✅ Complete |
-| REST API | FastAPI service | Sprint 4 |
-| Dashboard | Streamlit real-time display | Sprint 4 |
+| REST API | FastAPI service | ✅ Complete |
+| Dashboard | Streamlit real-time display | ✅ Complete |
 | AI/ML | Anomaly detection + MLflow | Sprint 5 |
 | Cloud | Azure AKS deployment | Sprint 6 |
 | Scheduler | Ground station contact planner | Sprint 6 |
@@ -207,6 +207,54 @@ by every service. All values overrideable by environment variables.
 - Dashboard (Sprint 4): port
 
 ---
+
+---
+
+### 5.6 `services/api/`
+
+**Role:** REST API gateway — the single data access layer for all
+upstream consumers.  No component except the API connects to
+TimescaleDB directly.
+
+**Application server:** Uvicorn (ASGI, async-first)
+**Framework:** FastAPI 0.141+
+
+**Endpoints:**
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/health` | Liveness check + DB connectivity |
+| `GET` | `/satellites` | Active satellite list with latest status |
+| `GET` | `/telemetry/{sat_id}/latest` | Most recent record (Redis-cached, 5 s TTL) |
+| `GET` | `/telemetry/{sat_id}` | Time-range query (`from`, `to`, `limit`) |
+| `GET` | `/telemetry/{sat_id}/summary` | 5-min aggregated buckets from continuous aggregate |
+
+**Key components:**
+- `main.py` — FastAPI app, lifespan (pool + Redis), CORS middleware
+- `db.py` — `get_pool()` dependency returning the asyncpg pool
+- `cache.py` — Optional Redis client; graceful fallback if Redis unavailable
+- `routers/` — One module per resource (`health`, `satellites`, `telemetry`)
+
+**Interactive docs:** available at `/docs` (Swagger UI) and `/redoc` when running.
+
+---
+
+### 5.7 `services/dashboard/`
+
+**Role:** Real-time operator dashboard.  A pure API client — calls the
+FastAPI exclusively; never connects to TimescaleDB or Kafka directly.
+
+**Framework:** Streamlit 1.63+
+
+**Panels:**
+- Live status row: 6 metrics (battery %, temperature, solar power, CPU, eclipse, contact)
+- Orbital position: lat, lon, alt + world map marker (`st.map()`)
+- Trending charts: battery SoC, temperature, solar power, CPU (from `/summary` endpoint)
+- Alarm panel: placeholder, populated in Sprint 5
+
+**Auto-refresh:** `time.sleep(N)` → `st.rerun()` — configurable 1–10 s interval via sidebar.
+
+**Start command:** `streamlit run services/dashboard/app.py`
 
 ## 6. Kafka topic structure
 
@@ -377,8 +425,8 @@ bootstrap server, database connection string).
 | DB driver (API) | asyncpg | Sprint 4 | — |
 | Orbit propagation | sgp4 | 2.27 | ADR-006 |
 | Testing | pytest | 9.1+ | — |
-| REST API | FastAPI | Sprint 4 | — |
-| Dashboard | Streamlit | Sprint 4 | — |
+| REST API | FastAPI + Uvicorn | 0.141+ | ADR-012 |
+| Dashboard | Streamlit | 1.63+ | ADR-013 |
 | ML / tracking | scikit-learn + MLflow | Sprint 5 | — |
 | Container | Docker + Compose | — | — |
 | Cloud | Azure AKS + Event Hubs | Sprint 6 | — |

@@ -58,8 +58,6 @@ logs/
 ~$*.xlsx
 ~$*.pptx
 ~*.tmp
-obital_elements_explained.txt
-
 
 # ── pytest cache ──────────────────────────────────────────────────────────────
 .pytest_cache/
