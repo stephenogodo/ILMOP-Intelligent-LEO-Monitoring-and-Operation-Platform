@@ -1,5 +1,6 @@
 from datetime import datetime
-from pydantic import BaseModel
+from typing import Literal
+from pydantic import BaseModel, Field
 
 
 class Telemetry(BaseModel):
@@ -8,8 +9,13 @@ class Telemetry(BaseModel):
     Produced by TelemetryGenerator and consumed by the Kafka pipeline, TimescaleDB
     sink, and operator dashboard.
 
-    Schema version: 2.0  (adds in_eclipse, in_contact; all six previously-static
-    fields are now dynamic; safe for Kafka JSON serialisation via model_dump(mode='json'))
+    Schema version: 2.1  (adds orbit_type field to enforce LEO/HEO ML model
+    separation — see ADR-016. Backward compatible: default value ensures all
+    existing LEO records are correctly classified.)
+
+    orbit_type values:
+        "LEO_CIRCULAR" — Scenarios 1, 2, 3 (circular LEO orbits, 550 km)
+        "HEO_MOLNIYA"  — Scenario 4 (Molniya HEO, 63.4°, e=0.74)
     """
 
     satellite_id:           str
@@ -21,6 +27,9 @@ class Telemetry(BaseModel):
     altitude_km:            float
     in_eclipse:             bool
     in_contact:             bool
+
+    # Orbit classification — gates ML model routing and training data separation
+    orbit_type: Literal["LEO_CIRCULAR", "HEO_MOLNIYA"] = "LEO_CIRCULAR"
 
     # Power subsystem
     battery_pct:            float
@@ -39,5 +48,6 @@ class Telemetry(BaseModel):
     uplink_rate_mbps:       float
 
     # Status flags
-    safe_mode:    bool = False
-    anomaly_flag: bool = False
+    safe_mode:              bool = False
+    anomaly_flag:           bool = False
+    fault_injected:         bool = False   # True when fault injection is active
