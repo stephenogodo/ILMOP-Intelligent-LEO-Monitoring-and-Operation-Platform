@@ -67,3 +67,22 @@ def test_model_dump_json_mode():
     record = t.model_dump(mode="json")
     assert isinstance(record["timestamp"], str)   # datetime serialised as ISO string
     assert record["in_eclipse"] is False
+
+
+# ── Schema v2.1 orbit_type tests (Sprint 5) ───────────────────────────────────
+
+def test_orbit_type_defaults_to_leo_circular():
+    tel = Telemetry(**_valid_payload())
+    assert tel.orbit_type == "LEO_CIRCULAR"
+
+def test_orbit_type_heo_molniya_accepted():
+    tel = Telemetry(**_valid_payload(orbit_type="HEO_MOLNIYA"))
+    assert tel.orbit_type == "HEO_MOLNIYA"
+
+def test_orbit_type_invalid_rejected():
+    with pytest.raises(ValidationError):
+        Telemetry(**_valid_payload(orbit_type="INVALID"))
+
+def test_fault_injected_defaults_false():
+    tel = Telemetry(**_valid_payload())
+    assert tel.fault_injected is False

@@ -68,7 +68,7 @@ def test_parse_valid_message(sink):
     record = sink._parse(msg)
     assert record is not None
     assert record["satellite_id"] == "SAT-001"
-    assert record["schema_version"] == "2.0"
+    assert record["schema_version"] == "2.1"
 
 
 def test_parse_returns_none_on_invalid_utf8(sink):
