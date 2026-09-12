@@ -178,11 +178,37 @@ else:
     else:
         st.info("No historical data available yet. Start the simulator and sink.")
 
-# ── Alarm panel (placeholder for Sprint 5) ────────────────────────────────────
+# ── Alarm panel ───────────────────────────────────────────────────────────────
 
 st.markdown("---")
 st.subheader("🚨 Alarms")
-st.info("Anomaly detection alarms will appear here in Sprint 5.")
+
+alarms = api_get(f"/alarms/{selected_sat}", params={"hours": 24})
+
+if alarms is None or len(alarms) == 0:
+    st.success("✅ No alarms in the last 24 hours.")
+else:
+    import pandas as pd
+
+    df_alarms = pd.DataFrame(alarms)
+
+    # Colour-code by severity
+    severity_colours = {"CRITICAL": "🔴", "WARNING": "🟡", "INFO": "🔵"}
+
+    for _, row in df_alarms.iterrows():
+        icon = severity_colours.get(row.get("severity", "INFO"), "🔵")
+        with st.expander(
+            f"{icon} [{row.get('severity','?')}] {row.get('parameter','?')} = "
+            f"{row.get('observed_value', 0):.2f} — {row.get('timestamp','')[:19]}",
+            expanded=row.get("severity") == "CRITICAL",
+        ):
+            st.write(f"**Message:** {row.get('message','')}")
+            st.write(f"**Anomaly score:** {row.get('anomaly_score', 0):.4f}")
+            st.write(f"**Expected range:** "
+                     f"{row.get('expected_min',0):.2f} – {row.get('expected_max',0):.2f}")
+            st.write(f"**Model version:** {row.get('model_version','?')}")
+            if row.get("from_fault_injection"):
+                st.warning("⚠️ This alarm was triggered by fault injection (not a real anomaly).")
 
 # ── Timestamp and auto-refresh ─────────────────────────────────────────────────
 
