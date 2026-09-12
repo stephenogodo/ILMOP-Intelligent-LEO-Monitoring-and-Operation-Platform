@@ -1,0 +1,37 @@
+# Scenario 3 — Multi-plane LEO constellation (24 satellites, 4x6)
+# Purpose: Operational scale, multi-plane scheduling, simultaneous trilateration
+name: "Multi-Plane LEO Constellation"
+scenario: 3
+orbit_type: "LEO_CIRCULAR"
+description: >
+  24 satellites in 4 orbital planes of 6 each, planes separated by 90° RAAN.
+  Near-global mid-latitude coverage (±53°). Satellites from different planes
+  arrive from different azimuths enabling GPS-style simultaneous trilateration.
+  Primary training dataset for the LEO anomaly detection production model.
+  Never mixed with HEO Molniya data (see ADR-016).
+
+planes:
+  - plane_id: "A"
+    raan_deg: 0.0
+    inclination_deg: 53.0
+    altitude_km: 550.0
+    eccentricity: 0.001
+    satellites: 6
+  - plane_id: "B"
+    raan_deg: 90.0
+    inclination_deg: 53.0
+    altitude_km: 550.0
+    eccentricity: 0.001
+    satellites: 6
+  - plane_id: "C"
+    raan_deg: 180.0
+    inclination_deg: 53.0
+    altitude_km: 550.0
+    eccentricity: 0.001
+    satellites: 6
+  - plane_id: "D"
+    raan_deg: 270.0
+    inclination_deg: 53.0
+    altitude_km: 550.0
+    eccentricity: 0.001
+    satellites: 6

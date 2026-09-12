@@ -1,0 +1,17 @@
+# Scenario 1 — Single LEO satellite
+# Purpose: Pipeline baseline, anomaly detection training, communication demo
+name: "Single Satellite"
+scenario: 1
+orbit_type: "LEO_CIRCULAR"
+description: >
+  One satellite in an ISS-class 550 km, 51.6° inclination orbit.
+  Baseline scenario for telemetry pipeline validation and the initial
+  anomaly detection training dataset.
+
+planes:
+  - plane_id: "A"
+    raan_deg: 45.0
+    inclination_deg: 51.6
+    altitude_km: 550.0
+    eccentricity: 0.001
+    satellites: 1

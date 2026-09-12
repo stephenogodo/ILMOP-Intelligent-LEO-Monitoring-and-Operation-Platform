@@ -1,0 +1,18 @@
+# Scenario 2 — Single-plane LEO constellation (6 satellites)
+# Purpose: Doppler navigation, sequential ranging demo, contact frequency improvement
+name: "Single-Plane Constellation"
+scenario: 2
+orbit_type: "LEO_CIRCULAR"
+description: >
+  6 satellites in one orbital plane, evenly spaced at 60° intervals.
+  Contact frequency increases from ~95 min (Scenario 1) to ~16 min.
+  Supports Doppler-based navigation and sequential accumulated ranging.
+  GPS-style simultaneous trilateration requires Scenario 3.
+
+planes:
+  - plane_id: "A"
+    raan_deg: 45.0
+    inclination_deg: 53.0
+    altitude_km: 550.0
+    eccentricity: 0.001
+    satellites: 6

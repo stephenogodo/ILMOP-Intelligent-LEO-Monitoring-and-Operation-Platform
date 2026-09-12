@@ -1,0 +1,35 @@
+# Scenario 4 — Molniya HEO polar constellation (6 satellites) — STANDALONE
+# Purpose: Polar coverage, long-dwell remote sensing, HEO operations demo
+# WARNING: NEVER mix training data from this scenario with Scenarios 1-3
+#          orbit_type=HEO_MOLNIYA enforces this at the data layer (ADR-016)
+name: "Molniya HEO Polar Coverage"
+scenario: 4
+orbit_type: "HEO_MOLNIYA"
+description: >
+  6 satellites in Molniya orbits providing continuous polar coverage.
+  Inclination 63.4° is the critical angle where J2 oblateness produces
+  zero apsidal precession, keeping apogee permanently over the northern
+  hemisphere. 6 satellites at 60° mean anomaly spacing ensure continuous
+  coverage with simultaneous dual-satellite visibility for handover demo.
+  STANDALONE — separate ML model, separate MLflow experiment, separate
+  TimescaleDB query filter. Never used in LEO model training.
+
+planes:
+  - plane_id: "M"
+    raan_deg: 0.0
+    inclination_deg: 63.4
+    eccentricity: 0.74
+    arg_perigee_deg: 270.0
+    perigee_altitude_km: 500.0
+    apogee_altitude_km: 39750.0
+    satellites: 6
+
+ground_stations:
+  - name: "Svalbard"
+    lat_deg: 78.2
+    lon_deg: 15.4
+    min_elevation_deg: 5.0
+  - name: "Fairbanks"
+    lat_deg: 64.8
+    lon_deg: -147.7
+    min_elevation_deg: 5.0
