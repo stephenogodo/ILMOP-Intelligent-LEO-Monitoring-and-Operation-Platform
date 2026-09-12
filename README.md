@@ -281,22 +281,10 @@ documents the error budget of both models.
 
 ---
 
-## Emerging publications
+## Research outputs
 
-The combination of ILMOP's system contributions and the PhD waveform
-work supports a publication pipeline across three research communities:
-
-| Paper | Target venue |
-|-------|-------------|
-| Synthetic physics-correlated telemetry dataset (ILMOP-TEL) | Nature Scientific Data |
-| ILMOP digital twin framework | Acta Astronautica / IAC |
-| Physics-informed ML for spacecraft anomaly detection | IEEE Transactions on Reliability |
-| Cloud-native ground segment architecture for LEO constellations | IEEE Access / SmallSat |
-| Mixed circular-HEO constellation design and scheduling | Acta Astronautica |
-| OFDM navigation demonstration and accuracy analysis | GPS Solutions / ION GNSS+ |
-| OFDM remote sensing — mid-latitude and polar | IEEE TGRS / IGARSS |
-| Flagship ISAC waveform paper | IEEE JSAC / IEEE TAES |
-| Survey: ISAC for LEO satellites | IEEE Communications Surveys and Tutorials |
+ILMOP supports an active research programme. Publications arising from
+this work will be listed here upon acceptance.
 
 ---
 

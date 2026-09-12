@@ -943,27 +943,35 @@ resolved in future sprints but deliberate architectural decisions:
 
 ## 15. Future Operational Capabilities
 
-### 15.1 Sprint 5 — Intelligent operations
+### 15.1 Sprint 5 — Intelligent operations ✅ Complete
+
+The following capabilities are now operational as of Sprint 5 (v0.5.0-beta):
 
 - **Real-time anomaly detection:** the Isolation Forest model scores every
-  incoming telemetry record and the alarm pipeline delivers WARNING and
+  incoming telemetry record. The alarm pipeline delivers WARNING and
   CRITICAL severity alerts to the operator dashboard within seconds of
-  the triggering event.
+  the triggering event. Run with:
+  `python -m services.anomaly_detection.detector`
 
-- **Fault injection:** the simulator can be configured to inject synthetic
-  faults (battery degradation, thermal runaway, safe-mode trigger) into
-  the telemetry stream for model validation. Fault injection is always
-  an explicit operator action — it cannot occur accidentally in normal
-  operations.
+- **Fault injection:** the simulator injects synthetic faults (battery
+  degradation, thermal runaway, safe-mode trigger) into the telemetry
+  stream for anomaly detection model validation. Fault-injected records
+  are labelled `fault_injected=True` and excluded from normal training
+  data. Fault injection is always an explicit operator action via the
+  `--fault` flag — it cannot occur accidentally in normal operations.
 
-- **Multi-satellite fleet operations:** the ConstellationManager enables
-  simultaneous simulation and monitoring of all four constellation
-  scenarios, with the dashboard displaying a fleet-wide health summary
-  and the ability to drill into any individual satellite.
+- **Multi-satellite fleet operations:** the `ConstellationManager` and
+  four constellation YAML files enable any of the four scenarios to be
+  launched from a single command (`run_demo.py`). The `--speed` parameter
+  enables training data generation at up to 3600× real time.
 
-- **Training data generation at scale:** the `--speed` parameter enables
-  training datasets to be generated orders of magnitude faster than real
-  time, making weekly model retraining practical.
+- **MLflow experiment tracking:** every training run logs parameters,
+  metrics, and model artifacts. Models are registered in the MLflow
+  registry as `ilmop-anomaly-leo_circular` and `ilmop-anomaly-heo_molniya`
+  and loaded by the detector service at startup.
+
+See ADR-014 (Isolation Forest), ADR-015 (MLflow), and ADR-016
+(LEO/HEO training data separation) for the full rationale.
 
 ### 15.2 Sprint 6 — Demonstration operations
 
@@ -1092,5 +1100,5 @@ statement in the methodology section to pre-empt reviewer questions:
 
 ---
 
-*Document version: 1.1 — Sections 16 added; Sections 6.2 and 11.2 corrected (navigation geometry)*
-*Previous version: 1.0 — initial ConOps*
+*Document version: 1.3 — Section 15.1 promoted to current; Sections 16 added; Sections 6.2 and 11.2 corrected*
+*Previous version: 1.2 — Section 9.3 antenna tracking added*

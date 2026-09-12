@@ -1,6 +1,6 @@
 # ILMOP Architecture Design Document (ADD)
 **Document ID:** DOC-007
-**Version:** 0.4.0 (reflects Sprint 1–4 implementation)
+**Version:** 0.5.0 (reflects Sprint 1–5 implementation)
 **Status:** Active — updated each sprint
 **Last updated:** 2026-08-25
 
@@ -255,6 +255,75 @@ FastAPI exclusively; never connects to TimescaleDB or Kafka directly.
 **Auto-refresh:** `time.sleep(N)` → `st.rerun()` — configurable 1–10 s interval via sidebar.
 
 **Start command:** `streamlit run services/dashboard/app.py`
+
+---
+
+### 5.8 `services/satellite_simulator/constellation.py`
+
+**Role:** Multi-satellite fleet runner. Loads a constellation scenario
+from a YAML config file in `config/constellations/`, instantiates one
+`TelemetryGenerator` per satellite, and generates all telemetry snapshots
+each tick.
+
+**Key classes:**
+- `ConstellationConfig` — loaded from YAML; expands orbital plane
+  definitions into individual `SatelliteConfig` objects with evenly
+  spaced mean anomalies
+- `ConstellationManager` — owns all `TelemetryGenerator` instances;
+  `generate_all()` returns a dict of `{satellite_id: Telemetry}` per tick;
+  supports `time_multiplier` and `fault_type` parameters
+
+**Orbit types supported:** `LEO_CIRCULAR` (Scenarios 1–3) and
+`HEO_MOLNIYA` (Scenario 4). The `orbit_type` is read from the YAML
+and propagated to every `TelemetryGenerator` and every `Telemetry`
+record — gates ML model routing per ADR-016.
+
+---
+
+### 5.9 `run_demo.py`
+
+**Role:** Single entry point for all four constellation scenarios.
+Instantiates `ConstellationManager`, publishes to Kafka, and logs
+progress.
+
+**Usage:**
+```
+python run_demo.py --scenario 1              # 1 satellite, real time
+python run_demo.py --scenario 3 --speed 60  # 24 satellites, 60× speed
+python run_demo.py --scenario 1 --fault battery_degradation
+```
+
+**`--speed` parameter:** advances simulated time at `N × wall-clock rate`.
+At `--speed 3600`, one week of 24-satellite training data generates in
+approximately 168 seconds. The contact model and orbit model both receive
+the simulated time step so all physics scale correctly at any speed.
+
+---
+
+### 5.10 `services/anomaly_detection/`
+
+**Role:** Real-time anomaly detection. Three modules:
+
+**`features.py`** — extracts a 10-element feature vector from each
+`Telemetry` record. Includes interaction terms (`battery_pct ×
+solar_panel_power_w`, `temperature_c × in_eclipse_int`) that capture
+the eclipse-battery-thermal correlations that make the problem learnable.
+Orbit type is a routing criterion, not a feature (see ADR-016).
+
+**`train.py`** — trains an Isolation Forest model for a given `orbit_type`.
+Exports training data from TimescaleDB with `WHERE orbit_type = %s AND
+fault_injected = FALSE`. Logs all parameters, metrics, and the model
+artifact to MLflow with `schema_version`, `orbit_type`, and `scenario`
+tags. Registers the model as `ilmop-anomaly-{orbit_type}` in the MLflow
+model registry.
+
+**`detector.py`** — Kafka consumer that scores every incoming telemetry
+record in real time. `ModelRouter` loads and caches the correct Isolation
+Forest model per `orbit_type`. Severity thresholds: score < −0.05 =
+WARNING, score < −0.15 = CRITICAL. Publishes `Alarm` records to
+`alarms.{satellite_id}`. Fault-injected records are skipped — they are
+anomalous by design and should not trigger operator alarms.
+
 
 ## 6. Kafka topic structure
 
