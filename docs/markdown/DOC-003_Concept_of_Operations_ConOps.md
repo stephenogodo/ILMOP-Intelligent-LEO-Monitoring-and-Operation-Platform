@@ -539,6 +539,87 @@ with the satellite's current state. Approval is the human decision that
 the command is the right operational response. These are different
 judgements and both are required.
 
+### 9.3 Antenna tracking — operational reality and ILMOP simplification
+
+#### What real LEO ground stations do
+
+In a real LEO ground station, the antenna **must** auto-track the
+satellite throughout the entire contact window. This is a fundamental
+operational requirement of LEO communications that distinguishes it
+from GEO operations.
+
+A GEO satellite at 35,786 km appears essentially stationary from the
+ground — a dish can be fixed in position for days. A LEO satellite at
+550 km moves at approximately 7.5 km/s and sweeps across the visible
+sky in 5–10 minutes, covering 60–120° of angular travel per pass. The
+angular slew rate peaks at 3–5°/second near the highest elevation point
+of an overhead pass. An antenna that stops tracking even briefly loses
+the link entirely.
+
+A production ground station tracking system performs three functions
+throughout the pass:
+
+**Mechanical pointing** — a two-axis motorised mount (azimuth and
+elevation) drives the antenna along the predicted pass trajectory,
+typically pre-loaded as a time-stamped pointing schedule computed from
+the satellite's orbital elements (programme track). High-gain narrow-beam
+systems also use RF-derived feedback (autotrack / monopulse) to correct
+residual pointing errors in real time.
+
+**Doppler compensation** — the satellite's radial velocity produces a
+Doppler frequency shift of up to ±50 kHz on a typical LEO downlink at
+S-band. The receiver tunes continuously to follow this shift throughout
+the pass. The uplink frequency is pre-compensated so the satellite
+receives commands at its nominal frequency regardless of the Doppler
+offset at each moment in the pass.
+
+**AOS/LOS detection** — the tracking controller monitors received signal
+strength to detect the actual acquisition and loss of signal moments,
+which may differ slightly from the predicted AOS/LOS times due to
+atmospheric effects, TLE age, and terrain masking.
+
+The pre-contact planning step that loads the pointing schedule is a real
+operational activity. For the Sprint 7 ground station scheduler, computing
+AOS and LOS times from SGP4 orbital mechanics is the prerequisite for
+generating this schedule.
+
+#### ILMOP simplification — what is and is not modelled
+
+ILMOP abstracts antenna tracking completely. The `_ContactModel` state
+machine transitions `in_contact = True` at the predicted AOS time and
+`in_contact = False` at the predicted LOS time. No pointing schedule,
+no tracking accuracy model, no Doppler compensation, and no link budget
+calculation are implemented.
+
+This is the correct simplification for ILMOP's purpose. ILMOP is a
+health monitoring and anomaly detection platform, not an RF link budget
+tool. The `downlink_rate_mbps` and `uplink_rate_mbps` fields assume
+the link is established and performing nominally — which implicitly
+assumes tracking is working correctly.
+
+The only tracking-related anomalies ILMOP would detect are:
+- An unexpectedly short pass (contact drops before predicted LOS) —
+  appears as an early `in_contact = False` transition, anomalous
+  relative to the expected pass duration model
+- Unexpectedly degraded link rates during a pass — appears as lower
+  than normal `downlink_rate_mbps`, detectable by the Isolation Forest
+  model
+
+**Note for publications** (Paper 4 — cloud-native ground segment,
+Paper 2 — digital twin framework): include the following statement in
+the ground segment architecture section to pre-empt reviewer questions:
+
+> *"The contact window model abstracts antenna tracking, Doppler
+> compensation, and link budget calculations. The `in_contact` flag
+> represents the operational state of the contact window — link
+> established and performing nominally — without modelling the
+> mechanical and RF processes that establish and maintain it. This
+> abstraction is appropriate for a health monitoring platform; a
+> full ground station simulator would incorporate a pointing schedule
+> generator, a tracking accuracy model, and a link budget calculator
+> as separate services consuming the SGP4 orbital truth provided by
+> the orbit model."*
+
 ---
 
 ## 10. Anomaly Detection and Response
@@ -834,8 +915,10 @@ resolved in future sprints but deliberate architectural decisions:
    training data, provided those anomalies represent meaningful deviations
    from the eclipse-correlated normal baseline.
 
-4. LEO and Molniya HEO telemetry signatures are sufficiently different that training a single model on both data types would produce a baseline
-   suitable for neither. This assumption motivates the `orbit_type` separation architecture.
+4. LEO and Molniya HEO telemetry signatures are sufficiently different
+   that training a single model on both data types would produce a baseline
+   suitable for neither. This assumption motivates the `orbit_type`
+   separation architecture.
 
 5. The HPOP NavigationTruthModel (poliastro with EGM2008 + NRLMSISE-00)
    achieves 1–10 metre positional accuracy for LEO circular orbits over
