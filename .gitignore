@@ -63,3 +63,7 @@ logs/
 .pytest_cache/
 .coverage
 htmlcov/
+
+docs/word/
+
+docs/word/
