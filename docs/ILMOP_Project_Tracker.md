@@ -207,19 +207,6 @@ Use Azure for Students ($100/year) for ongoing development.
 
 ## Publication pipeline (emerging from project + PhD work)
 
-| # | Paper title (short) | Target journal | When achievable |
-|---|---|---|---|
-| 1 | Synthetic telemetry dataset (ILMOP-TEL) | Nature Scientific Data / Data in Brief | Now — Scenario 1–2 data exists |
-| 2 | ILMOP digital twin framework | Acta Astronautica / IAC conference | After Sprint 5 |
-| 3 | Physics-informed anomaly detection | IEEE Transactions on Reliability | After Sprint 5 |
-| 4 | Cloud-native ground segment architecture | IEEE Access / SmallSat conference | After Sprint 7 |
-| 5 | Mixed circular-HEO constellation design | Acta Astronautica / IAC | After Sprint 7 |
-| 6 | OFDM navigation demonstration | GPS Solutions / ION GNSS+ | After PhD navigation demo |
-| 7 | OFDM remote sensing demonstration | IEEE TGRS / IGARSS conference | After PhD remote sensing demo |
-| 8 | Flagship ISAC waveform paper | IEEE JSAC / TAES | After all three demonstrations |
-| 9 | ISAC survey paper | IEEE Communications Surveys and Tutorials | Final year of PhD |
-
----
 
 ## Document register
 
