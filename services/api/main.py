@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from shared.config import settings
 from services.api.cache import init_cache, close_cache
-from services.api.routers import health, satellites, telemetry
+from services.api.routers import health, satellites, telemetry, alarms
 
 logging.basicConfig(
     level=logging.INFO,
@@ -85,6 +85,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(satellites.router)
 app.include_router(telemetry.router)
+app.include_router(alarms.router)
 
 
 # ── Dev entry point ───────────────────────────────────────────────────────────
