@@ -73,6 +73,9 @@ class Settings(BaseSettings):
     simulator_satellite_id: str = "SAT-001"
     simulator_tick_interval_s: float = 1.0   # seconds between telemetry ticks
 
+    # ── MLflow (Sprint 5) ────────────────────────────────────────────────────────
+    mlflow_tracking_uri: str = "mlruns"   # local file store; override for Azure Blob
+
     # ── Redis cache (Sprint 4) ────────────────────────────────────────────────
     redis_url: str = "redis://localhost:6379"
     cache_ttl_s: int = 5
