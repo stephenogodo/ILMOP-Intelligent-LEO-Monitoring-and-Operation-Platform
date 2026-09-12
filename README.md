@@ -1,10 +1,10 @@
 # ILMOP — Intelligent LEO Monitoring and Operation Platform
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-v0.4.0--beta-blue" alt="version"/>
+  <img src="https://img.shields.io/badge/version-v0.5.0--beta-blue" alt="version"/>
   <img src="https://img.shields.io/badge/python-3.12%2B-brightgreen" alt="python"/>
-  <img src="https://img.shields.io/badge/tests-75%20passing-brightgreen" alt="tests"/>
-  <img src="https://img.shields.io/badge/sprints-4%20of%207%20complete-orange" alt="sprints"/>
+  <img src="https://img.shields.io/badge/tests-116%20passing-brightgreen" alt="tests"/>
+  <img src="https://img.shields.io/badge/sprints-5%20of%207%20complete-orange" alt="sprints"/>
   <img src="https://img.shields.io/badge/licence-MIT-lightgrey" alt="licence"/>
 </p>
 
@@ -248,7 +248,7 @@ Every record produced by the simulator and persisted to TimescaleDB:
 | `downlink_rate_mbps` | float | Downlink rate (0 when not in contact) |
 | `uplink_rate_mbps` | float | Uplink rate (0 when not in contact) |
 | `safe_mode` | bool | Spacecraft safe mode flag |
-| `anomaly_flag` | bool | Anomaly detection flag (Sprint 5) |
+| `anomaly_flag` | bool | True when flagged by anomaly detection service |
 | `orbit_type` | str | `LEO_CIRCULAR` or `HEO_MOLNIYA` |
 
 ---
@@ -317,7 +317,7 @@ work supports a publication pipeline across three research communities:
 | REST API | FastAPI + Uvicorn | 0.141+ | ADR-012 |
 | Dashboard | Streamlit | 1.63+ | ADR-013 |
 | Cache | Redis | 7-alpine | — |
-| ML / tracking | scikit-learn + MLflow | Sprint 5 | ADR-014/015 |
+| ML / tracking | scikit-learn + MLflow | 1.8 / 3.16 | ADR-014/015 |
 | ILP scheduler | PuLP | Sprint 7 | ADR-019 |
 | Cloud | Azure AKS + Event Hubs | Sprint 7 | ADR-018 |
 | Testing | pytest | 9.1+ | — |
@@ -332,12 +332,53 @@ work supports a publication pipeline across three research communities:
 | 2 | v0.2.1-alpha | Simulator Physics Upgrade | ✅ Complete | 43/43 |
 | 3 | v0.3.0-alpha | Streaming Telemetry Platform | ✅ Complete | 57/57 |
 | 4 | v0.4.0-beta | Telemetry Data Platform — API and Dashboard | ✅ Complete | 75/75 |
-| 5 | v0.5.0-beta | Intelligent Digital Twin — AI/ML | 🔄 In progress | — |
-| 6 | v0.6.0-beta | Demonstration Layer — HPOP, Fleet Dashboard | Pending | — |
+| 5 | v0.5.0-beta | Intelligent Digital Twin — AI/ML | ✅ Complete | 116/116 |
+| 6 | v0.6.0-beta | Demonstration Layer — HPOP, Fleet Dashboard | ⬅ Next | — |
 | 7 | v1.0.0 | Cloud-Native Platform — Azure AKS | Pending | — |
 
 Full sprint scope, risk register, ADR register, and session log:
 [`docs/ILMOP_Project_Tracker.md`](docs/ILMOP_Project_Tracker.md)
+
+---
+
+## Sprint 5 capabilities — what is now operational
+
+Sprint 5 added the intelligent layer on top of the Sprint 1–4 data platform.
+The following are all operational:
+
+**Four-scenario demo runner** — a single command runs any constellation scenario:
+```bash
+python run_demo.py --scenario 1              # 1 satellite, real time
+python run_demo.py --scenario 2              # 6 satellites, single plane
+python run_demo.py --scenario 3 --speed 60  # 24 satellites, 4 planes, 60× speed
+python run_demo.py --scenario 4 --speed 10  # 6 Molniya HEO satellites (standalone)
+```
+
+**Fault injection** for anomaly detection model training:
+```bash
+python run_demo.py --scenario 1 --fault battery_degradation
+python run_demo.py --scenario 1 --fault thermal_runaway
+python run_demo.py --scenario 1 --fault safe_mode_trigger
+```
+
+**Anomaly detection training** (after generating data with the demo runner):
+```bash
+python -m services.anomaly_detection.train --orbit-type LEO_CIRCULAR
+python -m services.anomaly_detection.train --orbit-type HEO_MOLNIYA
+```
+
+**Real-time anomaly detection** (scores every incoming Kafka record):
+```bash
+python -m services.anomaly_detection.detector
+```
+
+**Key Sprint 5 design decisions:**
+- `orbit_type` field in the Telemetry schema (v2.1) enforces LEO/HEO training data
+  separation — LEO and Molniya models are trained and scored independently (ADR-016)
+- `fault_injected` flag labels synthetic fault records so they are excluded from
+  normal training data and do not trigger operator alarms
+- `time_multiplier` (`--speed`) enables training data generation at up to 3600×
+  real time — one week of 24-satellite data in under 3 minutes
 
 ---
 
@@ -431,7 +472,7 @@ python run_demo.py --scenario 4 --speed 10
 ```
 ILMOP/
 ├── config/
-│   └── constellations/          ← Scenario YAML files (Sprint 5)
+│   └── constellations/          ← 4 scenario YAML files (Sprints 1–4 complete)
 │       ├── scenario_1_single.yaml
 │       ├── scenario_2_single_orbit.yaml
 │       ├── scenario_3_multi_orbit.yaml
@@ -450,11 +491,11 @@ ILMOP/
 │   │   ├── db.py                ← asyncpg pool dependency
 │   │   ├── cache.py             ← Redis cache helpers
 │   │   └── routers/             ← health, satellites, telemetry, alarms
-│   ├── anomaly_detection/       ← Isolation Forest + MLflow (Sprint 5)
+│   ├── anomaly_detection/       ← Isolation Forest + MLflow ✅
 │   ├── dashboard/               ← Streamlit operator dashboard
 │   ├── kafka_consumer/          ← Debug consumer (pipeline verification)
 │   ├── kafka_producer/          ← Telemetry producer
-│   ├── predictive_health/       ← Battery SoH, thermal trend (Sprint 5)
+│   ├── predictive_health/       ← Battery SoH, thermal trend (Sprint 6)
 │   ├── satellite_simulator/     ← SGP4 orbit, physics models, Satellite domain object
 │   │   ├── orbit.py             ← SGP4 propagation + eclipse detection
 │   │   ├── battery.py           ← Eclipse-aware battery model
@@ -469,7 +510,7 @@ ILMOP/
 │   ├── config.py                ← pydantic-settings — all configuration
 │   └── schemas/
 │       ├── telemetry_schema.py  ← Telemetry Pydantic model (v2.0, 18 fields)
-│       └── alarm_schema.py      ← Alarm Pydantic model (Sprint 5)
+│       └── alarm_schema.py      ← Alarm Pydantic model v1.0 ✅
 ├── tests/                       ← pytest suite (75 tests, 0 warnings)
 ├── .env.example                 ← Environment variable template
 ├── .gitignore
