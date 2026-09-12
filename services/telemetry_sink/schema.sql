@@ -40,10 +40,15 @@ CREATE TABLE IF NOT EXISTS telemetry (
     -- Status flags
     safe_mode               BOOLEAN         DEFAULT FALSE,
     anomaly_flag            BOOLEAN         DEFAULT FALSE,
+    fault_injected          BOOLEAN         DEFAULT FALSE,
+
+    -- Orbit classification — gates ML model routing and training data separation
+    -- Values: 'LEO_CIRCULAR' (Scenarios 1-3) | 'HEO_MOLNIYA' (Scenario 4)
+    orbit_type              TEXT            DEFAULT 'LEO_CIRCULAR',
 
     -- Schema version — ties every row to the Telemetry schema it was
     -- written from; essential for Sprint 5 MLflow model versioning
-    schema_version          TEXT            DEFAULT '2.0'
+    schema_version          TEXT            DEFAULT '2.1'
 );
 
 -- Convert to a TimescaleDB hypertable partitioned on time
@@ -66,6 +71,10 @@ CREATE INDEX IF NOT EXISTS idx_telemetry_eclipse
 CREATE INDEX IF NOT EXISTS idx_telemetry_contact
     ON telemetry (in_contact, time DESC)
     WHERE in_contact = TRUE;
+
+-- ML training data access pattern: filter by orbit type for clean datasets
+CREATE INDEX IF NOT EXISTS idx_telemetry_orbit_type
+    ON telemetry (orbit_type, time DESC);
 
 -- ── Continuous aggregate: 5-minute telemetry summary ─────────────────────────
 -- Pre-computes per-satellite averages over 5-minute buckets.
@@ -97,3 +106,50 @@ SELECT add_continuous_aggregate_policy(
     schedule_interval => INTERVAL '5 minutes',
     if_not_exists => TRUE
 );
+
+
+-- ── Alarms table (Sprint 5) ──────────────────────────────────────────────────
+-- Stores anomaly detection alarms produced by the Isolation Forest service.
+CREATE TABLE IF NOT EXISTS alarms (
+    timestamp            TIMESTAMPTZ     NOT NULL,
+    satellite_id         TEXT            NOT NULL,
+    orbit_type           TEXT            DEFAULT 'LEO_CIRCULAR',
+    severity             TEXT            NOT NULL,
+    alarm_type           TEXT            NOT NULL,
+    parameter            TEXT,
+    observed_value       DOUBLE PRECISION,
+    expected_min         DOUBLE PRECISION,
+    expected_max         DOUBLE PRECISION,
+    anomaly_score        DOUBLE PRECISION,
+    model_version        TEXT,
+    message              TEXT,
+    from_fault_injection BOOLEAN         DEFAULT FALSE,
+    schema_version       TEXT            DEFAULT '1.0'
+);
+
+SELECT create_hypertable(
+    'alarms', 'timestamp',
+    if_not_exists => TRUE
+);
+
+CREATE INDEX IF NOT EXISTS idx_alarms_sat_time
+    ON alarms (satellite_id, timestamp DESC);
+
+CREATE INDEX IF NOT EXISTS idx_alarms_severity
+    ON alarms (severity, timestamp DESC);
+
+-- ── Storage management ────────────────────────────────────────────────────────
+-- Prevents unbounded disk growth during high-speed training data generation.
+-- Run automatically by TimescaleDB on a background schedule.
+
+-- Retention policies: drop chunks older than 7 days automatically
+SELECT add_retention_policy('telemetry', INTERVAL '7 days', if_not_exists => TRUE);
+SELECT add_retention_policy('alarms',    INTERVAL '7 days', if_not_exists => TRUE);
+
+-- Compression: reduce storage by 90-95% for chunks older than 2 hours
+ALTER TABLE telemetry SET (
+    timescaledb.compress,
+    timescaledb.compress_orderby   = 'time DESC',
+    timescaledb.compress_segmentby = 'satellite_id, orbit_type'
+);
+SELECT add_compression_policy('telemetry', INTERVAL '2 hours', if_not_exists => TRUE);

@@ -47,21 +47,23 @@ INSERT INTO telemetry (
     time, satellite_id,
     latitude_deg, longitude_deg, altitude_km,
     in_eclipse, in_contact,
+    orbit_type,
     battery_pct, battery_voltage_v, solar_panel_power_w,
     temperature_c,
     cpu_utilization_pct, memory_utilization_pct,
     downlink_rate_mbps, uplink_rate_mbps,
-    safe_mode, anomaly_flag,
+    safe_mode, anomaly_flag, fault_injected,
     schema_version
 ) VALUES (
     %(time)s, %(satellite_id)s,
     %(latitude_deg)s, %(longitude_deg)s, %(altitude_km)s,
     %(in_eclipse)s, %(in_contact)s,
+    %(orbit_type)s,
     %(battery_pct)s, %(battery_voltage_v)s, %(solar_panel_power_w)s,
     %(temperature_c)s,
     %(cpu_utilization_pct)s, %(memory_utilization_pct)s,
     %(downlink_rate_mbps)s, %(uplink_rate_mbps)s,
-    %(safe_mode)s, %(anomaly_flag)s,
+    %(safe_mode)s, %(anomaly_flag)s, %(fault_injected)s,
     %(schema_version)s
 )
 ON CONFLICT DO NOTHING;
@@ -172,9 +174,11 @@ class TelemetrySink:
             "memory_utilization_pct": tel.memory_utilization_pct,
             "downlink_rate_mbps":     tel.downlink_rate_mbps,
             "uplink_rate_mbps":       tel.uplink_rate_mbps,
+            "orbit_type":             tel.orbit_type,
             "safe_mode":              tel.safe_mode,
             "anomaly_flag":           tel.anomaly_flag,
-            "schema_version":         "2.0",
+            "fault_injected":         tel.fault_injected,
+            "schema_version":         "2.1",
         }
 
     def _flush(self, batch: list[dict]):
