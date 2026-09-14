@@ -640,6 +640,25 @@ threshold. The Alarm record includes the satellite ID, timestamp, which
 parameter triggered the detection, the observed value, the expected range,
 and a severity classification.
 
+The detector does not score fault-injected records. Any record carrying
+`fault_injected = True` is silently skipped before reaching the model.
+This is by design — fault injection is a controlled testing tool, not an
+operational event, and alarms generated from deliberately degraded records
+would be meaningless to an operator. All alarms published to
+`alarms.{satellite_id}` originate exclusively from normal records
+(`fault_injected = False`) whose values deviate from the trained normal
+baseline. The alarm therefore reflects a genuine physical state of the
+satellite, not an artefact of the testing infrastructure.
+
+A further subtlety: fault injection changes the physical state of the
+satellite object in memory (for example, progressively draining the
+battery). When fault injection stops and normal simulation resumes, the
+normal records that follow inherit that damaged state. It is those normal
+records — with `fault_injected = False` but physically unusual values —
+that the Isolation Forest scores as anomalous and raises an alarm on.
+The detector catches the consequence of the fault in the honest physics,
+not the fault itself.
+
 ### 10.2 Alarm severity levels
 
 | Severity | Meaning | Required response |
@@ -1211,5 +1230,6 @@ results.
 
 ---
 
-*Document version: 1.4 — Section 17 added: Simulation Fidelity Assumptions and Known Limitations*
+*Document version: 1.5 — Section 10.1 updated: fault_injected skip behaviour and alarm origin clarified*
+*Previous version: 1.4 — Section 17 added*
 *Previous version: 1.3 — Section 15.1 promoted to current operational*
