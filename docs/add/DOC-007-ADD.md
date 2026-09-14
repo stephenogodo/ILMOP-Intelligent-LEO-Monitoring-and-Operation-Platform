@@ -142,6 +142,15 @@ satellite at a configurable tick rate (default 1 Hz).
 
 **Outputs:** `Telemetry` objects (via `TelemetryGenerator.generate()`)
 
+**Simulation fidelity note:** The simulator applies several simplifying
+assumptions documented in full in ConOps Section 17. Key ones: SGP4
+orbit propagation with fixed elements (100–500 m LEO accuracy, no
+manoeuvres); single-node thermal model; idealised battery without
+capacity fade; binary eclipse model (no penumbra); no attitude control
+or radiation environment. These assumptions are appropriate for a
+research platform and must be stated in any publication using
+ILMOP-generated data.
+
 ---
 
 ### 5.2 `services/kafka_producer/`

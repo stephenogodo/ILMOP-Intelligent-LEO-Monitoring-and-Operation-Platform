@@ -1102,3 +1102,114 @@ statement in the methodology section to pre-empt reviewer questions:
 
 *Document version: 1.3 — Section 15.1 promoted to current; Sections 16 added; Sections 6.2 and 11.2 corrected*
 *Previous version: 1.2 — Section 9.3 antenna tracking added*
+
+---
+
+## 17. Simulation Fidelity Assumptions and Known Limitations
+
+This section is the authoritative register of simplifying assumptions
+applied throughout ILMOP, organised by system layer. These assumptions
+are appropriate for a research and demonstration platform and are
+explicitly bounded here so that results can be correctly interpreted,
+cited, and defended under peer review or PhD examination.
+
+The methodology sections of Papers 2, 3, 6, and 7 should each cite this
+section and state the subset of assumptions relevant to that paper's
+results.
+
+### 17.1 Orbital mechanics
+
+- **SGP4 with fixed elements.** 100–500 m accuracy for LEO circular
+  orbits; km-level near Molniya perigee. No manoeuvre modelling, no
+  epoch decay, no J5+ harmonics, no ocean tides, no relativistic
+  corrections. The HPOP NavigationTruthModel (1–10 m, Sprint 6) is
+  used only as the navigation truth reference — not for operational
+  orbit computation.
+- **No eclipse penumbra.** Cylindrical shadow model produces a sharp
+  step at eclipse entry and exit. Real transition is a 1–2 minute ramp.
+- **Circular orbit approximation.** Eccentricity set to 0.001 for
+  Scenarios 1–3; real constellation satellites have non-zero
+  eccentricities producing small per-orbit altitude variations.
+
+### 17.2 Spacecraft physics
+
+- **Single-node thermal model.** One temperature value for the entire
+  spacecraft; no spatial variation, no subsystem-level thermal coupling.
+- **Idealised battery.** Fixed charge/discharge rates; no capacity fade,
+  no temperature-dependent efficiency, no voltage sag. Degradation
+  exists only as explicit fault injection.
+- **Constant solar panel output.** No panel radiation degradation
+  (~1–3%/year in reality), no solar incidence angle variation.
+- **No attitude control.** No ADCS power consumption, no reaction wheel
+  or magnetorquer modelling, no safe-mode attitude dynamics.
+- **No radiation environment.** Single-event upsets and
+  radiation-induced anomalies are not modelled — the anomaly detection
+  model does not train on this anomaly class.
+
+### 17.3 Ground segment and communications
+
+- **Binary contact model.** Perfect link assumed for the full pass
+  duration — no link budget, pointing loss, rain fade, Doppler
+  degradation, or interference. Replaced by geometry-driven ILP
+  scheduler in Sprint 7.
+- **No uplink command latency.** Commands take effect instantaneously;
+  real round-trip latency is seconds to minutes.
+- **No stored telemetry latency.** Anomaly detection operates on a
+  continuous 1 Hz stream, not on burst arrivals at contact windows.
+  See Section 16 for the reviewer-ready methodology statement.
+
+### 17.4 Anomaly detection and machine learning
+
+- **Stationarity assumption.** Isolation Forest trained on stationary
+  data — spacecraft behaviour evolves over a real mission lifetime.
+  Periodic retraining required; automated drift detection is a future
+  capability.
+- **No operating mode awareness.** One continuous operational mode
+  simulated; mode transitions can cause false positives in a real system.
+- **Synthetic fault representativeness.** Fault injection uses linear
+  approximations of real failure mechanisms — real degradation follows
+  complex physical models. A model validated only on synthetic faults
+  may not generalise to all real failure trajectories.
+
+### 17.5 Navigation demonstration
+
+- **Single-frequency, code-phase (pseudorange) only.** Ionospheric
+  delay (2–15 m) and tropospheric delay (2–25 m) are not eliminated.
+  Hardware delay biases are not modelled. Carrier-phase (centimetre-
+  level) accuracy is not claimed — expected accuracy is metres to tens
+  of metres. These must be stated explicitly in the navigation paper
+  error budget.
+
+### 17.6 System-level
+
+- **No fault tolerance.** Each service runs as a single instance with
+  no redundancy — appropriate for a research platform, must be stated
+  in publications.
+- **Simulated time vs wall-clock.** `--speed` timestamps are simulated
+  mission time, not real dates. Time-based analysis is valid; absolute
+  timestamps are not real mission dates.
+- **No security model (Sprints 1–6).** No API authentication, no Kafka
+  TLS, default database credentials. Addressed in Sprint 7 Azure
+  deployment.
+
+### 17.7 Summary table
+
+| Layer | Assumption | Impact | Mitigation |
+|---|---|---|---|
+| Orbital | SGP4, 100–500 m accuracy | Navigation truth limited | HPOP for navigation (Sprint 6) |
+| Orbital | No manoeuvres or epoch decay | Orbit does not drift | Out of scope for Sprint 1–7 |
+| Orbital | No eclipse penumbra | Step vs ramp at eclipse boundary | Minor; acceptable for training data |
+| Physics | Single-node thermal | No subsystem thermal anomalies | Stated in papers |
+| Physics | Idealised battery | No capacity fade in normal data | Fault injection covers degradation |
+| Physics | No radiation environment | Radiation anomalies undetectable | Stated as out of scope |
+| Ground | Binary contact model | No link quality anomalies | ILP scheduler in Sprint 7 |
+| Ground | No stored telemetry latency | Continuous stream vs burst arrival | ConOps Section 16 |
+| ML | Stationarity | Model drift not detected | Periodic retraining |
+| ML | No mode awareness | False positives on transitions | Mode-conditional detection future |
+| Navigation | Single-freq, code-phase | Ionospheric + tropospheric errors | Stated in navigation paper error budget |
+| System | No redundancy | Single point of failure | Stated in publications |
+
+---
+
+*Document version: 1.4 — Section 17 added: Simulation Fidelity Assumptions and Known Limitations*
+*Previous version: 1.3 — Section 15.1 promoted to current operational*

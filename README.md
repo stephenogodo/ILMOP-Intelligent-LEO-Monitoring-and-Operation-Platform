@@ -329,6 +329,66 @@ Full sprint scope, risk register, ADR register, and session log:
 
 ---
 
+## Simplifying assumptions
+
+ILMOP is a research and demonstration platform, not a production flight
+system. The following simplifying assumptions are applied throughout.
+They are appropriate for the platform's purpose and are explicitly bounded
+here and in the Concept of Operations (Section 17) so that results
+derived from ILMOP can be correctly interpreted and cited.
+
+**Orbital mechanics**
+- SGP4 orbit propagation with fixed orbital elements — no manoeuvre
+  modelling, no epoch decay, no J5+ gravitational harmonics, no ocean
+  tides, and no relativistic corrections. Positional accuracy is
+  100–500 m for LEO circular orbits; km-level near Molniya perigee.
+- Eclipse detection uses a cylindrical shadow model with a sharp step
+  transition — no penumbra (partial shadowing at eclipse entry/exit).
+- A High Precision Orbit Propagation model (HPOP, poliastro, 1–10 m
+  accuracy) is used only as the navigation truth reference (Sprint 6);
+  SGP4 is used for all operational purposes.
+
+**Spacecraft physics**
+- Single-node thermal model — one temperature value for the entire
+  spacecraft; no spatial variation, no subsystem-level thermal coupling.
+- Idealised battery — fixed charge/discharge rates independent of
+  temperature, age, or depth of discharge; no capacity fade over time
+  (except via explicit fault injection).
+- Constant solar panel output in sunlight — no panel degradation,
+  no solar incidence angle variation, no temperature-dependent efficiency.
+- No attitude control modelling — no reaction wheel power consumption,
+  no magnetorquer activation, no safe-mode attitude dynamics.
+- No radiation environment — single-event upsets and radiation-induced
+  anomalies are not modelled.
+
+**Ground segment**
+- Binary contact model — perfect link assumed for the full pass duration;
+  no link budget, no Doppler compensation, no pointing loss, no rain fade.
+- Single ground station approximation in Sprints 1–5 — contact windows
+  are random-duration timers; geometry-driven scheduling begins in Sprint 7.
+- Telemetry flows continuously in the simulation — stored telemetry
+  latency (data arriving in bursts at contact windows) is not modelled.
+  See ConOps Section 16.
+
+**Anomaly detection**
+- Isolation Forest trained on stationary, mode-agnostic telemetry —
+  no concept of spacecraft operating modes; no concept drift detection;
+  periodic retraining required as spacecraft behaviour evolves.
+- Synthetic fault injection is a simplified representation of real failure
+  modes — linear degradation rather than physically modelled mechanisms.
+
+**Navigation demonstration**
+- Single-frequency pseudorange ranging — ionospheric delay is not
+  eliminated; tropospheric delay and hardware biases are not modelled.
+- Code-phase (pseudorange) accuracy, not carrier-phase — expected
+  accuracy is metres to tens of metres, not centimetres.
+
+The full assumptions register with rationale is in
+[`docs/markdown/DOC-003_Concept_of_Operations_ConOps.md`](docs/markdown/DOC-003_Concept_of_Operations_ConOps.md)
+Section 17.
+
+---
+
 ## Sprint 5 capabilities — what is now operational
 
 Sprint 5 added the intelligent layer on top of the Sprint 1–4 data platform.
