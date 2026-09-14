@@ -75,9 +75,8 @@ class TelemetrySink:
     Kafka consumer that persists validated telemetry records to TimescaleDB.
     """
 
-    def __init__(self, satellite_id: str | None = None):
-        self._satellite_id = satellite_id or settings.simulator_satellite_id
-        self._topic        = settings.telemetry_topic(self._satellite_id)
+    def __init__(self):
+        pass   # all config via settings; topic pattern in run()
 
         self._consumer = Consumer({
             "bootstrap.servers":  settings.kafka_bootstrap_servers,
@@ -89,8 +88,8 @@ class TelemetrySink:
         self._conn   = psycopg2.connect(settings.timescaledb_dsn)
         self._cursor = self._conn.cursor()
 
-        log.info("TelemetrySink ready | satellite=%s topic=%s db=%s",
-                 self._satellite_id, self._topic, settings.timescaledb_name)
+        log.info("TelemetrySink ready | subscribed to telemetry.* | db=%s",
+                 settings.timescaledb_name)
 
     # ── Public ────────────────────────────────────────────────────────────────
 
@@ -99,8 +98,10 @@ class TelemetrySink:
         Consume, validate, and persist telemetry records continuously.
         Commits to the database and Kafka in batches.
         """
-        self._consumer.subscribe([self._topic])
-        log.info("Subscribed to %s — waiting for records …", self._topic)
+        self._consumer.subscribe(
+            [rf"^{settings.kafka_telemetry_topic_prefix}\..*"]
+        )
+        log.info("Subscribed to telemetry.* — waiting for records …")
 
         batch        = []
         batch_start  = time.monotonic()

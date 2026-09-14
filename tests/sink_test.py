@@ -60,7 +60,7 @@ def sink(monkeypatch):
         "services.telemetry_sink.sink.Consumer",
         MagicMock()
     )
-    return TelemetrySink(satellite_id="SAT-001")
+    return TelemetrySink()
 
 
 def test_parse_valid_message(sink):
