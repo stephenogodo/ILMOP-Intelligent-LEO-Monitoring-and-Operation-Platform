@@ -133,8 +133,8 @@ summary = api_get(
 
 if summary:
     df = pd.DataFrame(summary)
-    df["time"] = pd.to_datetime(df["time"])
-    df = df.set_index("time")
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df = df.set_index("timestamp")
 
     chart_col1, chart_col2 = st.columns(2)
 
