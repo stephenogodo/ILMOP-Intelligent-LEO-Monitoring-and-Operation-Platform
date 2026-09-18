@@ -173,9 +173,10 @@ class _FaultInjector:
             return battery_pct, temperature_c, safe_mode, False
 
         elif self.fault_type == FaultType.BATTERY_DEGRADATION:
-            # Progressively accelerate battery discharge — mimics cell degradation
-            self._degradation_pct = min(self._degradation_pct + 0.05, 20.0)
-            degraded = max(0.0, battery_pct - self._degradation_pct)
+            # Drain battery at 0.5% per simulated tick regardless of solar charging.
+            # At --speed 60 this drains from 100% to 0% in ~3 real seconds,
+            # ensuring the post-fault low-battery state is clearly anomalous.
+            degraded = max(0.0, battery_pct - 0.5)
             return degraded, temperature_c, safe_mode, True
 
         elif self.fault_type == FaultType.THERMAL_RUNAWAY:
