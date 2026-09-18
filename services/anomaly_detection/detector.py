@@ -124,7 +124,7 @@ def build_alarm(
 
     # Distinguish limit-check alarms from IF alarms
     alarm_type = "LIMIT_CHECK" if score <= -0.99 else "ANOMALY_SCORE"
-    display_score = score if score > -0.99 else float("nan")
+    display_score = score if score > -0.99 else -1.0
 
     return Alarm(
         satellite_id         = telemetry.satellite_id,
