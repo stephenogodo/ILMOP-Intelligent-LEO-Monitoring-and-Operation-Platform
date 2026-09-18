@@ -148,6 +148,14 @@ class AlarmSink:
 
                 for msg in messages:
                     if msg.error():
+                        from confluent_kafka import KafkaError
+                        if msg.error().code() == KafkaError.UNKNOWN_TOPIC_OR_PART:
+                            log.info(
+                                "Alarm topics not yet created — detector has "
+                                "not published any alarms yet. Retrying in %ss …",
+                                BATCH_TIMEOUT,
+                            )
+                            break   # back to consume() loop — do not raise
                         raise KafkaException(msg.error())
                     record = self._parse(msg)
                     if record:

@@ -1,8 +1,9 @@
 # ADR-014: Isolation Forest for spacecraft telemetry anomaly detection
 
-**Status:** Accepted
+**Status:** Accepted (updated Sprint 5 → training doctrine corrected)
 **Sprint:** 5
 **Date:** 2026-09-11
+**Last updated:** 2026-09-18
 **Decider:** ILMOP Project
 
 ---
@@ -40,6 +41,11 @@ requirements specific to ILMOP:
 detection algorithm for ILMOP Sprint 5. A separate model is trained per
 `orbit_type` using eclipse-correlated feature vectors. Inference runs at
 each incoming telemetry record via `decision_function()`.
+
+**Training doctrine (corrected):** The LEO_CIRCULAR model must be trained
+on Scenario 3 data — all 24 satellites across all 4 orbital planes
+simultaneously — not on single-satellite Scenario 1 data. See Consequences
+section for the rationale.
 
 ---
 
@@ -181,10 +187,60 @@ generating a sufficient normal training dataset.
   or LSTM-based methods may outperform Isolation Forest (Sprint 6+
   enhancement path if needed)
 
+### Critical training doctrine — Scenario 3 required
+
+**The LEO_CIRCULAR model must be trained on Scenario 3 data, not
+Scenario 1 data.** This is a non-negotiable operational requirement.
+
+The Isolation Forest learns the joint statistical distribution of the
+training data. If trained on a single satellite (SAT-A1, Scenario 1),
+the model learns SAT-A1's specific orbital phase distribution — the
+pattern of battery, temperature, eclipse state, and solar power as
+they occur along SAT-A1's specific ground track and contact window
+timing. This distribution is not representative of the other 23
+satellites in the constellation, which occupy different orbital phases
+and have different eclipse timing, battery charge states, and contact
+windows at every moment in time.
+
+Consequence of single-satellite training: satellites in different orbital
+phases (SAT-A4 at 180° offset from SAT-A1, cross-plane satellites SAT-B3,
+SAT-C2, SAT-D5) produce telemetry that sits in the lower-density regions
+of the SAT-A1-trained feature space, triggering spurious WARNING alarms
+on records that are genuinely normal. This was observed during Sprint 5
+verification and is not an acceptable operational state for a fleet
+anomaly detection system.
+
+**Correct training procedure:**
+
+```powershell
+# Generate Scenario 3 training data (all 24 satellites)
+# Terminal 1:
+python run_demo.py --scenario 3 --speed 60
+
+# Terminal 2 (simultaneously):
+python -m services.telemetry_sink.sink
+
+# Run for 3-5 minutes, then stop both.
+# Train on the full LEO constellation dataset:
+python -m services.anomaly_detection.train --orbit-type LEO_CIRCULAR
+```
+
+The training script queries `WHERE orbit_type='LEO_CIRCULAR' AND
+fault_injected=FALSE` — it automatically includes all 24 satellites.
+No code changes are required.
+
+**Why this is sufficient:** all 24 LEO_CIRCULAR satellites share the
+same orbit type, altitude, and inclination. Their telemetry differs
+only in orbital phase and RAAN — both of which are captured by the
+full 3-5 minute Scenario 3 training run. The trained model's decision
+boundary reflects the complete normal operating envelope of the
+constellation, not a single satellite's trajectory.
+
 ### Implications for future sprints
-- Sprint 6: per-satellite models can be trained once sufficient
-  individual telemetry history accumulates (> 1 week), replacing the
-  fleet-level model with satellite-specific baselines
+- Sprint 6: per-satellite models remain an enhancement path for detecting
+  subtle early-stage degradation specific to individual satellites —
+  but are no longer required to eliminate cross-satellite false positives,
+  which Scenario 3 training resolves completely
 - Sprint 7: MLflow model registry enables A/B comparison between
   Isolation Forest and autoencoder models on the same validation set
   without changing the scoring service interface
