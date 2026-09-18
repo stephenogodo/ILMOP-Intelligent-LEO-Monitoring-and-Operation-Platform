@@ -80,7 +80,7 @@ def load_training_data(orbit_type: str) -> list[Telemetry]:
     return records
 
 
-def train(orbit_type: str, contamination: float = 0.05):
+def train(orbit_type: str, contamination: float = 0.01):
     """
     Train an Isolation Forest model for the given orbit type.
 
@@ -174,7 +174,7 @@ if __name__ == "__main__":
         choices=["LEO_CIRCULAR", "HEO_MOLNIYA"],
         default="LEO_CIRCULAR",
     )
-    parser.add_argument("--contamination", type=float, default=0.05)
+    parser.add_argument("--contamination", type=float, default=0.01)
     args = parser.parse_args()
 
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
