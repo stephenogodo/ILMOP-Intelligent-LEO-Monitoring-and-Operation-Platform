@@ -183,36 +183,41 @@ else:
 st.markdown("---")
 st.subheader("🚨 Alarms")
 
+# st.empty() creates a single-slot container that is completely replaced on
+# each rerun — prevents stale expander widgets from a previous satellite
+# selection persisting in the widget tree when the dropdown changes.
+_alarm_slot = st.empty()
+
 alarms = api_get(f"/alarms/{selected_sat}", params={"hours": 24})
 
-if alarms is None or len(alarms) == 0:
-    st.success("✅ No alarms in the last 24 hours.")
-else:
-    import pandas as pd
+with _alarm_slot.container():
+    if alarms is None or len(alarms) == 0:
+        st.success("✅ No alarms in the last 24 hours.")
+    else:
+        import pandas as pd
 
-    df_alarms = pd.DataFrame(alarms)
+        df_alarms = pd.DataFrame(alarms)
 
-    # Colour-code by severity
-    severity_colours = {"CRITICAL": "🔴", "WARNING": "🟡", "INFO": "🔵"}
+        # Colour-code by severity
+        severity_colours = {"CRITICAL": "🔴", "WARNING": "🟡", "INFO": "🔵"}
 
-    for _, row in df_alarms.iterrows():
-        icon = severity_colours.get(row.get("severity", "INFO"), "🔵")
-        with st.expander(
-            f"{icon} [{row.get('severity','?')}] {row.get('parameter','?')} = "
-            f"{row.get('observed_value', 0):.2f} — {row.get('timestamp','')[:19]}",
-            expanded=row.get("severity") == "CRITICAL",
-        ):
-            st.write(f"**Message:** {row.get('message','')}")
-            st.write(f"**Anomaly score:** {row.get('anomaly_score', 0):.4f}")
-            st.write(f"**Expected range:** "
-                     f"{row.get('expected_min',0):.2f} – {row.get('expected_max',0):.2f}")
-            st.write(f"**Model version:** {row.get('model_version','?')}")
-            if row.get("from_fault_injection"):
-                st.warning("⚠️ This alarm was triggered by fault injection (not a real anomaly).")
+        for _, row in df_alarms.iterrows():
+            icon = severity_colours.get(row.get("severity", "INFO"), "🔵")
+            with st.expander(
+                f"{icon} [{row.get('severity','?')}] {row.get('parameter','?')} = "
+                f"{row.get('observed_value', 0):.2f} — {row.get('timestamp','')[:19]}",
+                expanded=row.get("severity") == "CRITICAL",
+            ):
+                st.write(f"**Message:** {row.get('message','')}")
+                st.write(f"**Anomaly score:** {row.get('anomaly_score', 0):.4f}")
+                st.write(f"**Expected range:** "
+                         f"{row.get('expected_min',0):.2f} – {row.get('expected_max',0):.2f}")
+                st.write(f"**Model version:** {row.get('model_version','?')}")
+                if row.get("from_fault_injection"):
+                    st.warning("⚠️ This alarm was triggered by fault injection (not a real anomaly).")
 
 # ── Timestamp and auto-refresh ─────────────────────────────────────────────────
 
 st.caption(f"Last updated: {pd.Timestamp.now(tz='UTC').strftime('%Y-%m-%d %H:%M:%S UTC')}")
-
 time.sleep(refresh_s)
 st.rerun()
