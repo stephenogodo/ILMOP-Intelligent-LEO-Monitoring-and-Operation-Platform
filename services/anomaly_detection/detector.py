@@ -111,36 +111,78 @@ def build_alarm(
 ) -> Alarm:
     """Construct an Alarm record from a scored Telemetry record."""
 
-    # Identify the most anomalous parameter (heuristic: largest deviation
-    # from nominal — a full per-feature analysis is a Sprint 6 enhancement)
-    if telemetry.battery_pct < 20.0:
+    # Identify the most anomalous parameter
+    if telemetry.battery_pct <= 10.0:
         parameter, observed = "battery_pct", telemetry.battery_pct
-        expected_min, expected_max = 20.0, 100.0
-    elif telemetry.temperature_c > 65.0 or telemetry.temperature_c < -35.0:
+        expected_min, expected_max = 10.0, 100.0
+    elif telemetry.temperature_c > 55.0 or telemetry.temperature_c < -28.0:
         parameter, observed = "temperature_c", telemetry.temperature_c
-        expected_min, expected_max = -30.0, 60.0
+        expected_min, expected_max = -28.0, 55.0
     else:
         parameter, observed = "anomaly_score", score
         expected_min, expected_max = THRESHOLD_WARNING, 1.0
+
+    # Distinguish limit-check alarms from IF alarms
+    alarm_type = "LIMIT_CHECK" if score <= -0.99 else "ANOMALY_SCORE"
+    display_score = score if score > -0.99 else float("nan")
 
     return Alarm(
         satellite_id         = telemetry.satellite_id,
         timestamp            = telemetry.timestamp,
         orbit_type           = telemetry.orbit_type,
         severity             = severity,
-        alarm_type           = "ANOMALY_SCORE",
+        alarm_type           = alarm_type,
         parameter            = parameter,
         observed_value       = observed,
         expected_min         = expected_min,
         expected_max         = expected_max,
-        anomaly_score        = score,
+        anomaly_score        = display_score,
         model_version        = MODEL_VERSION,
         message              = (
             f"{severity}: {parameter}={observed:.2f} "
-            f"(score={score:.4f}) on {telemetry.satellite_id}"
+            f"({'limit exceeded' if alarm_type == 'LIMIT_CHECK' else f'score={score:.4f}'}) "
+            f"on {telemetry.satellite_id}"
         ),
         from_fault_injection = telemetry.fault_injected,
     )
+
+
+def _check_limits(tel: Telemetry) -> Optional[str]:
+    """
+    Layer 1 — Rule-based limit checking.
+
+    Returns a severity string if the record violates a hard operational
+    limit, or None if all parameters are within acceptable bounds.
+
+    These rules complement the Isolation Forest (Layer 2). The Isolation
+    Forest catches subtle multivariate deviations; limit checking catches
+    unambiguous single-parameter violations that the IF may miss when
+    other features are within the normal distribution.
+
+    Thresholds are operationally conservative — they should never fire
+    on genuinely healthy satellites.
+    """
+    # Battery critically depleted in sunlight — impossible in healthy operation
+    if tel.battery_pct < 5.0 and tel.solar_panel_power_w > 100.0:
+        return "CRITICAL"
+
+    # Battery very low regardless of eclipse state
+    if tel.battery_pct < 10.0:
+        return "WARNING"
+
+    # Temperature above spacecraft survival limit
+    if tel.temperature_c > 70.0:
+        return "CRITICAL"
+
+    # Temperature approaching survival limit
+    if tel.temperature_c > 55.0:
+        return "WARNING"
+
+    # Temperature below survival floor
+    if tel.temperature_c < -28.0:
+        return "WARNING"
+
+    return None   # all limits satisfied
 
 
 class AnomalyDetectionService:
@@ -226,6 +268,23 @@ class AnomalyDetectionService:
                 if telemetry.fault_injected:
                     continue
 
+                # ── Layer 1: Rule-based limit checking ────────────────────────
+                # Hard threshold violations that must always alarm regardless of
+                # Isolation Forest score. This is the industry-standard complement
+                # to statistical anomaly detection — used by every real satellite
+                # operations centre for critical parameter monitoring.
+                limit_severity = _check_limits(telemetry)
+                if limit_severity:
+                    alarm = build_alarm(
+                        telemetry,
+                        score    = -0.99,   # sentinel: limit-check alarm
+                        severity = limit_severity,
+                    )
+                    self._publish_alarm(alarm)
+                    continue   # limit violation is definitive — skip IF scoring
+
+                # ── Layer 2: Isolation Forest anomaly detection ───────────────
+                # Catches subtle multivariate deviations that hard limits miss
                 score = self._router.score(telemetry)
                 if score is None:
                     continue   # no model available
