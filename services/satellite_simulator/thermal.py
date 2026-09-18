@@ -32,7 +32,7 @@ class ThermalModel:
     NOISE_STD_C       = 0.15     # Gaussian jitter (°C)
 
     TEMP_MIN_C        = -30.0    # hard lower limit (survival temperature)
-    TEMP_MAX_C        =  70.0    # hard upper limit (survival temperature)
+    TEMP_MAX_C        = 120.0    # hard upper limit — catastrophic thermal runaway ceiling
 
     def __init__(self, initial_temp_c: float = 20.0):
         self.temperature_c = float(initial_temp_c)
