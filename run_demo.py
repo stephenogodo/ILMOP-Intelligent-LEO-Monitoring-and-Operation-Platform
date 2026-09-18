@@ -127,13 +127,20 @@ def main():
 
             if published % (manager.satellite_count * 10) == 0:
                 first = next(iter(snapshots.values()))
+                # Build a dynamic status string showing the most relevant
+                # telemetry parameter for the active fault type
+                if fault == FaultType.THERMAL_RUNAWAY:
+                    status = f"temp={first.temperature_c:.1f}°C"
+                elif fault == FaultType.SAFE_MODE_TRIGGER:
+                    status = f"safe_mode={first.safe_mode}"
+                else:
+                    status = f"batt={first.battery_pct:.1f}%"
                 log.info(
-                    "Published %d records | sat=%s eclipse=%s batt=%.1f%% "
-                    "fault=%s",
+                    "Published %d records | sat=%s eclipse=%s %s fault=%s",
                     published,
                     first.satellite_id,
                     first.in_eclipse,
-                    first.battery_pct,
+                    status,
                     first.fault_injected,
                 )
 
