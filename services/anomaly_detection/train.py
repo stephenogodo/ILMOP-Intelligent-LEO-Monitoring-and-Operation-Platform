@@ -50,7 +50,9 @@ TRAINING_SQL = """
     FROM telemetry
     WHERE orbit_type = %s
       AND fault_injected = FALSE
-      AND safe_mode = FALSE
+      AND safe_mode     = FALSE
+      AND battery_pct   > 5.0
+      AND temperature_c < 50.0
     ORDER BY time ASC
 """
 
