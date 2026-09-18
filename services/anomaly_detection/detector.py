@@ -154,6 +154,13 @@ class AnomalyDetectionService:
 
     def __init__(self):
         self._router = ModelRouter()
+        # ── Eager preload — load known models on startup so the detector
+        # is ready to score the very first record without a lazy-load delay.
+        # Without this the model only loads when the first record of each
+        # orbit_type arrives, creating a gap where records are consumed but
+        # not scored.
+        for orbit_type in ("LEO_CIRCULAR", "HEO_MOLNIYA"):
+            self._router._get_model(orbit_type)
 
         self._consumer = Consumer({
             "bootstrap.servers": settings.kafka_bootstrap_servers,
