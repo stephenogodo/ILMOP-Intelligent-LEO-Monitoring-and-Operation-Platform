@@ -1,6 +1,6 @@
 # ADR-014: Isolation Forest for spacecraft telemetry anomaly detection
 
-**Status:** Accepted (updated Sprint 5 → training doctrine corrected)
+**Status:** Accepted (updated — contamination calibration corrected)
 **Sprint:** 5
 **Date:** 2026-09-11
 **Last updated:** 2026-09-18
@@ -42,10 +42,14 @@ detection algorithm for ILMOP Sprint 5. A separate model is trained per
 `orbit_type` using eclipse-correlated feature vectors. Inference runs at
 each incoming telemetry record via `decision_function()`.
 
-**Training doctrine (corrected):** The LEO_CIRCULAR model must be trained
-on Scenario 3 data — all 24 satellites across all 4 orbital planes
-simultaneously — not on single-satellite Scenario 1 data. See Consequences
-section for the rationale.
+**Contamination parameter:** The operational value is `contamination=0.01`.
+The initial default of `contamination=0.05` was found to produce spurious
+WARNING alarms on genuinely normal telemetry. See Consequences section.
+
+**Training data:** The LEO_CIRCULAR model should be trained on Scenario 3
+data (all 24 satellites) as a matter of good practice for a fleet anomaly
+detection system. However, the training dataset does not affect the false
+positive rate — that is governed exclusively by the contamination parameter.
 
 ---
 
@@ -53,59 +57,33 @@ section for the rationale.
 
 ### Supervised classification (Random Forest, XGBoost with fault labels)
 
-Would train on labelled examples of normal and anomalous telemetry,
-learning a decision boundary between the two classes.
-
 **Rejected because:** ILMOP has no real anomaly labels. Fault injection
-(Sprint 5) produces synthetic labelled faults, but a model trained
-exclusively on synthetic faults will not generalise to the real anomaly
-patterns it has never seen. Supervised methods require representative
-positive examples of every anomaly type of interest — an impossible
-requirement for a spacecraft that has not yet experienced failures.
-A semi-supervised approach using only normal training data is correct.
+produces synthetic labelled faults, but a model trained exclusively on
+synthetic faults will not generalise to real anomaly patterns it has
+never seen. A semi-supervised approach using only normal training data
+is correct.
 
 ### One-Class SVM (sklearn.svm.OneClassSVM)
 
-Trains a hyperplane boundary around normal data in a high-dimensional
-kernel space. Effective for low-dimensional datasets with clear normal
-boundaries.
-
-**Rejected because:** OCSVM training cost scales as O(n²) to O(n³) with
-the number of training samples. At 1 Hz with 24 satellites and a 7-day
-retention window, the training dataset contains approximately 14.5 million
-records — beyond practical OCSVM training time. Isolation Forest trains
-in O(n log n) and scales to this dataset size comfortably. OCSVM also
-requires careful kernel and hyperparameter tuning; Isolation Forest is
-more robust to default settings.
+**Rejected because:** OCSVM training cost scales as O(n²) to O(n³).
+At 1 Hz with 24 satellites and a 7-day retention window, the training
+dataset contains approximately 14.5 million records — beyond practical
+OCSVM training time. Isolation Forest trains in O(n log n) and scales
+comfortably.
 
 ### Autoencoder (neural network reconstruction error)
 
-Trains a neural network to reconstruct normal telemetry records; high
-reconstruction error on anomalous records triggers an alarm.
-
 **Rejected because:** autoencoders require significantly more training
-data than Isolation Forest to generalise well, and their training
-stability (learning rate, architecture, vanishing gradients) requires
-more tuning effort. For a research platform aiming to demonstrate
-anomaly detection principles, not deep learning engineering, a simpler
-interpretable algorithm is more appropriate. Autoencoder-based detection
-is a Sprint 6+ enhancement if the Isolation Forest false positive rate
-proves unacceptably high.
+data and tuning effort. For a research platform demonstrating anomaly
+detection principles, a simpler interpretable algorithm is appropriate.
 
 ### Statistical threshold monitoring (Z-score, IQR)
 
-Set upper and lower bounds on each telemetry field individually;
-alarm when a value exceeds its bounds.
-
-**Rejected because:** this approach misses the most operationally
-significant anomaly class: physically inconsistent correlations. A
-battery that is discharging during a sunlight pass, with solar panel
-output at 1300W, would not trigger any individual-field threshold
-alarm because each field value is within its individual normal range.
-Only a multivariate method that learns the joint distribution of
-(battery_pct, solar_panel_power_w, in_eclipse) can detect this class
-of anomaly. The Isolation Forest operates on the full 10-feature vector
-and captures these correlations.
+**Rejected because:** this approach misses physically inconsistent
+correlations — the most operationally significant anomaly class. Only
+a multivariate method that learns the joint distribution of all 10
+features can detect anomalies like a battery discharging during a
+sunlight pass.
 
 ---
 
@@ -113,41 +91,15 @@ and captures these correlations.
 
 Isolation Forest isolates anomalies by recursively partitioning the
 feature space with random splits. Normal records — which cluster
-together in the feature space due to eclipse-battery-thermal
-correlations — require many splits to isolate. Anomalous records
-— which sit in sparse, unusual regions of the feature space — are
-isolated in fewer splits. The anomaly score (decision function output)
-is the mean path length across the ensemble of trees; shorter path
-= more anomalous.
+together due to eclipse-battery-thermal correlations — require many
+splits to isolate. Anomalous records sit in sparse regions and are
+isolated in fewer splits. The anomaly score is the mean path length
+across the ensemble; shorter path = more anomalous.
 
-Three properties make Isolation Forest the correct choice for ILMOP:
-
-**1. Unsupervised by design.** The algorithm learns only from normal
-data. No anomaly labels are required at training time. The `fault_injected`
-filter in the training SQL (`WHERE fault_injected = FALSE`) ensures the
-model learns genuine normal behaviour rather than the deliberately
-degraded patterns from fault injection runs.
-
-**2. Linear scaling.** O(n log n) training on arbitrarily large normal
-datasets. A 7-day LEO dataset (≈600,000 records for a single satellite)
-trains in seconds on a laptop CPU with `n_jobs=-1`.
-
-**3. Multivariate anomaly detection.** The 10-feature vector includes
-interaction terms (`battery_pct * solar_panel_power_w`,
-`temperature_c * in_eclipse_int`) that capture the eclipse-correlated
-joint structure. A battery at 87% with 1300W solar output and
-`in_eclipse=False` is normal. A battery at 87% with 1300W solar output
-and `in_eclipse=True` is physically impossible — and the interaction
-feature `battery_pct * solar_panel_power_w` combined with the eclipse
-flag gives the model the information to detect this.
-
-**Severity thresholds** are set on the `decision_function` score:
+**Severity thresholds** (set on the `decision_function` score):
 - Score ≥ −0.05: normal — no alarm
 - Score < −0.05: WARNING
 - Score < −0.15: CRITICAL
-
-These thresholds are configurable and should be calibrated after
-generating a sufficient normal training dataset.
 
 ---
 
@@ -155,92 +107,69 @@ generating a sufficient normal training dataset.
 
 ### Positive
 - Fault-injected records are explicitly excluded from scoring via the
-  `fault_injected` flag check in `detector.py`. Alarms are therefore
-  guaranteed to originate from normal records (`fault_injected = False`)
-  whose physical state has diverged from the trained baseline — not from
-  records deliberately degraded for testing. This ensures the alarm
-  pipeline is operationally meaningful even when fault injection and
-  normal simulation run simultaneously.
-- A further consequence: the detector catches the physical consequence
-  of a fault in the honest post-fault telemetry, not the fault records
-  themselves. When fault injection stops and normal simulation resumes,
-  the satellite's damaged state (e.g. low battery) is reflected in
-  normal records that the model scores as anomalous — making the
-  detection physically meaningful rather than purely statistical.
-- No anomaly labels required — the model trains on whatever normal
-  telemetry the demo runner generates
-- Fast training and inference — no GPU or specialised hardware needed
-- Eclipse-battery-thermal correlations are learnable via interaction
-  features in the 10-feature vector
-- `contamination` parameter (default 0.05) explicitly models the
-  expected fraction of anomalies, tunable per deployment
-- Fully explainable at the feature level — when an alarm fires, the
-  parameter most responsible for the anomaly score can be identified
-  by feature contribution analysis
+  `fault_injected` flag in `detector.py`. Alarms originate exclusively
+  from normal records (`fault_injected=False`) whose physical state has
+  diverged from the trained baseline.
+- The detector catches the physical consequence of a fault in honest
+  post-fault telemetry. When fault injection stops and normal simulation
+  resumes, the satellite's damaged state is reflected in normal records
+  that score as anomalous — making detection physically meaningful.
+- No anomaly labels required
+- Fast training and inference — no GPU needed
+- Eclipse-battery-thermal correlations captured via interaction features
+- Fully explainable at the feature level
 
 ### Negative / trade-offs
-- Isolation Forest is not inherently incremental — retraining requires
-  a full batch run, not online updates
-- The anomaly score is relative, not absolute — thresholds require
-  calibration against real operational data to reduce false positives
-- For very high-dimensional data or complex anomaly patterns, autoencoders
-  or LSTM-based methods may outperform Isolation Forest (Sprint 6+
-  enhancement path if needed)
+- Not inherently incremental — full batch retraining required
+- Anomaly score is relative — thresholds require calibration
+- For very complex anomaly patterns, autoencoders may outperform
+  Isolation Forest (Sprint 6+ enhancement path)
 
-### Critical training doctrine — Scenario 3 required
+### Critical calibration finding — contamination parameter
 
-**The LEO_CIRCULAR model must be trained on Scenario 3 data, not
-Scenario 1 data.** This is a non-negotiable operational requirement.
+**The contamination parameter is the primary determinant of false
+positive rate and must be set to 0.01 for operational deployment.**
 
-The Isolation Forest learns the joint statistical distribution of the
-training data. If trained on a single satellite (SAT-A1, Scenario 1),
-the model learns SAT-A1's specific orbital phase distribution — the
-pattern of battery, temperature, eclipse state, and solar power as
-they occur along SAT-A1's specific ground track and contact window
-timing. This distribution is not representative of the other 23
-satellites in the constellation, which occupy different orbital phases
-and have different eclipse timing, battery charge states, and contact
-windows at every moment in time.
+The contamination parameter sets the decision boundary so that exactly
+`contamination × N` training records fall below it. At `contamination=0.05`
+(the sklearn default), 5% of all records — including genuinely normal ones
+— are expected to score below the WARNING threshold by design. With 24
+satellites running simultaneously, this produces approximately one
+satellite's worth of continuous spurious WARNING alarms on perfectly
+normal telemetry.
 
-Consequence of single-satellite training: satellites in different orbital
-phases (SAT-A4 at 180° offset from SAT-A1, cross-plane satellites SAT-B3,
-SAT-C2, SAT-D5) produce telemetry that sits in the lower-density regions
-of the SAT-A1-trained feature space, triggering spurious WARNING alarms
-on records that are genuinely normal. This was observed during Sprint 5
-verification and is not an acceptable operational state for a fleet
-anomaly detection system.
+This was verified experimentally:
 
-**Correct training procedure:**
+| Training data | contamination | Result |
+|---|---|---|
+| SAT-A1 only | 0.05 | Continuous spurious WARNINGs on cross-plane satellites |
+| All 24 satellites (Scenario 3) | 0.05 | Continuous spurious WARNINGs — problem persisted |
+| All 24 satellites (Scenario 3) | 0.01 | No alarms on normal telemetry — correct behaviour |
+
+The experiment confirms that **contamination=0.05 was the sole cause of
+spurious alarms**, not the training dataset composition. Single-satellite
+(SAT-A1) training was initially suspected as the cause but this hypothesis
+was disproved — even after retraining on all 24 satellites, spurious alarms
+persisted at contamination=0.05.
+
+**Correct training command:**
 
 ```powershell
-# Generate Scenario 3 training data (all 24 satellites)
-# Terminal 1:
-python run_demo.py --scenario 3 --speed 60
-
-# Terminal 2 (simultaneously):
-python -m services.telemetry_sink.sink
-
-# Run for 3-5 minutes, then stop both.
-# Train on the full LEO constellation dataset:
-python -m services.anomaly_detection.train --orbit-type LEO_CIRCULAR
+python -m services.anomaly_detection.train --orbit-type LEO_CIRCULAR --contamination 0.01
 ```
 
-The training script queries `WHERE orbit_type='LEO_CIRCULAR' AND
-fault_injected=FALSE` — it automatically includes all 24 satellites.
-No code changes are required.
+### Training data recommendation
 
-**Why this is sufficient:** all 24 LEO_CIRCULAR satellites share the
-same orbit type, altitude, and inclination. Their telemetry differs
-only in orbital phase and RAAN — both of which are captured by the
-full 3-5 minute Scenario 3 training run. The trained model's decision
-boundary reflects the complete normal operating envelope of the
-constellation, not a single satellite's trajectory.
+Training on Scenario 3 (all 24 satellites) remains the recommended
+practice for a fleet anomaly detection system. A model trained on the
+full constellation learns a more representative normal operating envelope
+than one trained on a single satellite, making its detection of genuine
+anomalies more reliable. However, this is a quality improvement, not a
+false positive fix — the contamination parameter governs false positives.
 
 ### Implications for future sprints
 - Sprint 6: per-satellite models remain an enhancement path for detecting
-  subtle early-stage degradation specific to individual satellites —
-  but are no longer required to eliminate cross-satellite false positives,
-  which Scenario 3 training resolves completely
+  subtle early-stage degradation specific to individual satellites
 - Sprint 7: MLflow model registry enables A/B comparison between
-  Isolation Forest and autoencoder models on the same validation set
-  without changing the scoring service interface
+  Isolation Forest and autoencoder models without changing the scoring
+  service interface
