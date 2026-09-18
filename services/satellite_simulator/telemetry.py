@@ -307,6 +307,13 @@ class TelemetryGenerator:
         sat.temperature_c = temp
         sat.safe_mode     = safe
 
+        # Sync fault-modified values back into model internal state so the
+        # next tick starts from the degraded state rather than the previous
+        # equilibrium. Without this the ThermalModel fights the fault injector
+        # every tick and temperature never rises above normal range.
+        self._battery.battery_pct   = sat.battery_pct
+        self._thermal.temperature_c = sat.temperature_c
+
         # 7. Snapshot → immutable Telemetry record
         # Persist physical state every tick so it survives process restarts
         _save_state(sat.satellite_id, sat.battery_pct, sat.temperature_c)
