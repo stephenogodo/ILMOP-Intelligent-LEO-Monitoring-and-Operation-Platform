@@ -11,12 +11,53 @@ each tick.  Sprint 5 additions:
 import random
 from datetime import datetime, timezone, timedelta
 from typing import Literal
+import json
+import os
+import pathlib
 
 from shared.schemas.telemetry_schema import Telemetry
 from services.satellite_simulator.satellite import Satellite
 from services.satellite_simulator.orbit import OrbitModel
 from services.satellite_simulator.battery import BatteryModel
 from services.satellite_simulator.thermal import ThermalModel
+
+# ── State persistence ─────────────────────────────────────────────────────────
+# Battery and thermal state are saved on shutdown and restored on startup so
+# that physical degradation accumulated during fault injection is not lost when
+# the process restarts in normal mode. Without this, every new process starts
+# with a fresh battery at ~95%, making post-fault alarm demonstration impossible.
+
+_STATE_DIR = pathlib.Path("data/sim_state")
+
+def _state_path(satellite_id: str) -> pathlib.Path:
+    return _STATE_DIR / f"{satellite_id}.json"
+
+def _save_state(satellite_id: str, battery_pct: float, temperature_c: float) -> None:
+    """Persist physical state to disk so it survives process restarts."""
+    try:
+        _STATE_DIR.mkdir(parents=True, exist_ok=True)
+        with open(_state_path(satellite_id), "w") as f:
+            json.dump({"battery_pct": battery_pct, "temperature_c": temperature_c}, f)
+    except Exception:
+        pass  # state persistence is best-effort — never crash the simulator
+
+def _load_state(satellite_id: str) -> dict | None:
+    """Load persisted physical state. Returns None if no saved state exists."""
+    try:
+        path = _state_path(satellite_id)
+        if path.exists():
+            with open(path) as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return None
+
+def _clear_state(satellite_id: str) -> None:
+    """Remove saved state for a satellite."""
+    try:
+        _state_path(satellite_id).unlink(missing_ok=True)
+    except Exception:
+        pass
 
 
 # ── Supporting models ─────────────────────────────────────────────────────────
@@ -192,6 +233,14 @@ class TelemetryGenerator:
 
         self.satellite = Satellite(satellite_id=satellite_id)
 
+        # ── Restore persisted physical state if available ─────────────────────
+        # When restarting after fault injection the saved battery and temperature
+        # carry over — anomalous state is preserved for the detector to score.
+        saved = _load_state(satellite_id)
+        if saved:
+            self.satellite.battery_pct    = float(saved["battery_pct"])
+            self.satellite.temperature_c  = float(saved["temperature_c"])
+
         self._orbit   = OrbitModel(
             raan_deg         = raan_deg,
             inclination_deg  = inclination_deg,
@@ -259,6 +308,9 @@ class TelemetryGenerator:
         sat.safe_mode     = safe
 
         # 7. Snapshot → immutable Telemetry record
+        # Persist physical state every tick so it survives process restarts
+        _save_state(sat.satellite_id, sat.battery_pct, sat.temperature_c)
+
         return Telemetry(
             satellite_id            = sat.satellite_id,
             timestamp               = self._sim_time,
@@ -280,3 +332,7 @@ class TelemetryGenerator:
             anomaly_flag            = sat.anomaly_flag,
             fault_injected          = fault,
         )
+
+    def clear_state(self) -> None:
+        """Remove persisted state — call to force a fresh battery start."""
+        _clear_state(self.satellite_id)
