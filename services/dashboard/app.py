@@ -73,7 +73,7 @@ selected_sat = st.sidebar.selectbox("Satellite", sat_ids)
 
 st.sidebar.markdown("---")
 history_hours = st.sidebar.slider("History window (hours)", 1, 24, 2)
-refresh_s     = st.sidebar.slider("Refresh interval (s)", 1, 10, 2)
+refresh_s     = st.sidebar.slider("Refresh interval (s)", 1, 30, 6)
 
 st.sidebar.markdown("---")
 st.sidebar.caption(f"API: `{API}`")
@@ -219,5 +219,6 @@ with _alarm_slot.container():
 # ── Timestamp and auto-refresh ─────────────────────────────────────────────────
 
 st.caption(f"Last updated: {pd.Timestamp.now(tz='UTC').strftime('%Y-%m-%d %H:%M:%S UTC')}")
+
 time.sleep(refresh_s)
 st.rerun()
