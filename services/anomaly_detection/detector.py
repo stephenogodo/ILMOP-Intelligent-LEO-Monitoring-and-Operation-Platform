@@ -153,15 +153,11 @@ def _check_limits(tel: Telemetry) -> Optional[str]:
 
     Returns a severity string if the record violates a hard operational
     limit, or None if all parameters are within acceptable bounds.
-
-    These rules complement the Isolation Forest (Layer 2). The Isolation
-    Forest catches subtle multivariate deviations; limit checking catches
-    unambiguous single-parameter violations that the IF may miss when
-    other features are within the normal distribution.
-
-    Thresholds are operationally conservative — they should never fire
-    on genuinely healthy satellites.
     """
+    # Absolute battery depletion — always CRITICAL regardless of eclipse
+    if tel.battery_pct == 0.0:
+        return "CRITICAL"
+
     # Battery critically depleted in sunlight — impossible in healthy operation
     if tel.battery_pct < 5.0 and tel.solar_panel_power_w > 100.0:
         return "CRITICAL"
@@ -196,13 +192,15 @@ class AnomalyDetectionService:
 
     def __init__(self):
         self._router = ModelRouter()
-        # ── Eager preload — load known models on startup so the detector
-        # is ready to score the very first record without a lazy-load delay.
-        # Without this the model only loads when the first record of each
-        # orbit_type arrives, creating a gap where records are consumed but
-        # not scored.
+        # Eager preload models on startup
         for orbit_type in ("LEO_CIRCULAR", "HEO_MOLNIYA"):
             self._router._get_model(orbit_type)
+
+        # Standing alarm suppression — tracks last alarm time per
+        # satellite+parameter to avoid flooding on persistent conditions.
+        # Key: "{satellite_id}:{parameter}", Value: last alarm simulated timestamp
+        self._standing_alarms: dict[str, float] = {}
+        self._suppression_window_s: float = 60.0  # suppress re-alarm within 60 sim-seconds
 
         self._consumer = Consumer({
             "bootstrap.servers": settings.kafka_bootstrap_servers,
@@ -231,6 +229,25 @@ class AnomalyDetectionService:
         except Exception as e:
             log.warning("Failed to parse telemetry record: %s", e)
             return None
+
+    def _should_publish(self, alarm: Alarm) -> bool:
+        """
+        Standing alarm suppression — returns True only if this alarm
+        should be published. Suppresses re-alarms for the same satellite
+        and parameter within the suppression window to prevent flooding.
+
+        When a condition clears (parameter returns to normal) and then
+        re-triggers, the suppression window resets and a new alarm fires.
+        """
+        key = f"{alarm.satellite_id}:{alarm.parameter}"
+        last_ts = self._standing_alarms.get(key)
+        now_ts  = alarm.timestamp.timestamp()
+
+        if last_ts is not None and (now_ts - last_ts) < self._suppression_window_s:
+            return False  # suppress — same condition fired recently
+
+        self._standing_alarms[key] = now_ts
+        return True
 
     def _publish_alarm(self, alarm: Alarm):
         topic   = settings.alarms_topic(alarm.satellite_id)
@@ -269,30 +286,27 @@ class AnomalyDetectionService:
                     continue
 
                 # ── Layer 1: Rule-based limit checking ────────────────────────
-                # Hard threshold violations that must always alarm regardless of
-                # Isolation Forest score. This is the industry-standard complement
-                # to statistical anomaly detection — used by every real satellite
-                # operations centre for critical parameter monitoring.
                 limit_severity = _check_limits(telemetry)
                 if limit_severity:
                     alarm = build_alarm(
                         telemetry,
-                        score    = -0.99,   # sentinel: limit-check alarm
+                        score    = -0.99,
                         severity = limit_severity,
                     )
-                    self._publish_alarm(alarm)
-                    continue   # limit violation is definitive — skip IF scoring
+                    if self._should_publish(alarm):
+                        self._publish_alarm(alarm)
+                    continue
 
                 # ── Layer 2: Isolation Forest anomaly detection ───────────────
-                # Catches subtle multivariate deviations that hard limits miss
                 score = self._router.score(telemetry)
                 if score is None:
-                    continue   # no model available
+                    continue
 
                 severity = score_to_severity(score)
                 if severity:
                     alarm = build_alarm(telemetry, score, severity)
-                    self._publish_alarm(alarm)
+                    if self._should_publish(alarm):
+                        self._publish_alarm(alarm)
 
         except KeyboardInterrupt:
             log.info("Shutting down anomaly detection service …")
