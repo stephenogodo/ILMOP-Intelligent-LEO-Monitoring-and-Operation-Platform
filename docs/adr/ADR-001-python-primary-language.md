@@ -1,88 +1,59 @@
-# ADR-001: Python as primary implementation language
+# ADR-001 — Python as the Primary Development Language
 
-**Status:** Accepted
-**Sprint:** 1
-**Date:** 2026-08-25
-**Decider:** ILMOP Project
+**Date:** 2024-01-01  
+**Status:** Accepted  
+**Deciders:** Stephen Ogodo  
 
 ---
 
 ## Context
 
-ILMOP requires a language capable of supporting four distinct technical domains simultaneously: 
-numerical simulation (orbit propagation, physics models), 
-data engineering (Kafka producers and consumers, database I/O), 
-machine learning (anomaly detection, predictive health models), and 
-web services (REST API, real-time dashboard). 
-The language choice affects every sprint from 1 to 6 and constrains which libraries, deployment patterns, and team knowledge apply.
+ILMOP requires a language capable of orchestrating multiple concerns simultaneously: orbital mechanics computation, event streaming, machine learning, REST API serving, and interactive dashboards. The language must have mature libraries for all of these domains, a strong scientific computing ecosystem, and wide availability of satellite-domain tooling.
 
 ---
 
 ## Decision
 
-Python 3.12+ is the primary implementation language for all ILMOP services: the satellite simulator, Kafka producer and consumer, telemetry sink, FastAPI REST layer, Streamlit dashboard, and MLflow-tracked ML models.
-
----
-
-## Alternatives considered
-
-### C++
-The language of choice for flight software and high-performance ground system components (YAMCS uses Java; many heritage systems use C++).
-Provides deterministic memory management, sub-millisecond latency, and direct hardware access.
-
-**Rejected because:** ILMOP is a ground software platform, not flight software. Its performance bottleneck is network I/O and database writes,
-not computation. C++ offers no advantage for Kafka consumers or TimescaleDB queries, and its development velocity for a single-developer research platform is far lower. The machine learning ecosystem (scikit-learn,
-TensorFlow, PyTorch) is Python-first; a C++ ML implementation would require maintaining custom inference code rather than leveraging a world-class open-source ecosystem.
-
-### Java
-The language of YAMCS, the most widely deployed open-source mission
-operations system. Strong typing, JVM performance, mature Kafka client (Apache Kafka itself is written in Java/Scala). Industry precedent exists for production-grade MOS implementations in Java.
-
-**Rejected because:** Java's development overhead (verbose syntax, compilation cycle, dependency management with Maven/Gradle) reduces iteration speed for a single developer. The Python ML ecosystem has no
-Java equivalent of comparable maturity. FastAPI and Streamlit — the planned Sprint 4 web layer — are Python-native with no Java counterparts of similar productivity. The JVM's startup time also complicates
-containerised microservice patterns.
-
-### MATLAB / GNU Octave
-MATLAB is widely used in aerospace engineering for signal processing, orbit analysis, and simulation. The lead developer's PhD research
-(OFDM waveform design) uses MATLAB for waveform prototyping.
-
-**Rejected because:** MATLAB's licensing cost is prohibitive for an open-source platform. GNU Octave lacks the production deployment infrastructure (Kafka clients, REST frameworks, container support) needed
-for a multi-service architecture. Neither can serve as a backend for a production API or dashboard. MATLAB is retained for the PhD waveform research track where it is the appropriate tool; Python is the appropriate
-tool for the operations platform.
+Python 3.12 is the primary development language for all ILMOP services.
 
 ---
 
 ## Rationale
 
-Python is the only language that spans all four technical domains ILMOP
-requires without requiring polyglot architecture:
+Python's scientific computing ecosystem is unmatched for this combination of requirements. NumPy provides the numerical array operations underpinning the orbital mechanics and feature engineering layers (Harris et al., 2020). scikit-learn provides the Isolation Forest implementation used in the anomaly detection service (Pedregosa et al., 2011). The SGP4 orbital propagator is available as a well-maintained Python library that directly implements the Vallado et al. (2006) formulation. FastAPI provides the REST layer with automatic OpenAPI documentation (Ramírez, 2018).
 
-- **Simulation:** `sgp4`, `numpy`, `scipy` provide production-quality numerical computing
-- **Data engineering:** `confluent-kafka`, `psycopg2`/`asyncpg`, `pydantic` provide the full Kafka and database stack
-- **Machine learning:** `scikit-learn`, `mlflow`, `pandas` cover the planned Sprint 5 anomaly detection and experiment tracking requirements
-- **Web services:** `fastapi`, `streamlit`, `uvicorn` cover the Sprint 4 API and dashboard requirements
-- **Cloud deployment:** Azure SDK for Python, Docker, and Kubernetes Python tooling are all first-class
+No alternative language offered this combination without significant development overhead. MATLAB has the orbital mechanics tooling but lacks the event streaming and ML deployment ecosystem. Java has the streaming ecosystem but lacks the scientific computing ergonomics and the specific satellite libraries.
 
-A single-language architecture means one dependency management system (`pip`/`requirements.txt`), one testing framework (`pytest`), one container base image, and one knowledge domain for the developer. For a
-platform that spans simulation through AI through cloud deployment, the unified ecosystem is a decisive advantage. 
-The Azure deployment target (Sprint 6) is also relevant: Azure Functions, Azure ML, and Azure Kubernetes Service all have first-class Python support.
+Python's type annotation support (PEP 484, PEP 526) combined with Pydantic v2 enables rigorous schema validation without sacrificing the productivity advantages of dynamic typing. The virtual environment system (.venv) provides reproducible dependency isolation across development and deployment environments.
+
 ---
 
 ## Consequences
 
-### Positive
-- Unified ecosystem across all technical domains
-- Fastest iteration speed for a single developer
-- Direct integration with the scientific Python stack for PhD research overlap (orbit propagation, signal analysis) All planned libraries (sgp4, confluent-kafka, fastapi, mlflow, streamlit, scikit-learn) are Python-native and actively maintained  Azure, Docker, and Kubernetes tooling all support Python as a first-class deployment target
+**Positive:**
+- Access to the full scientific Python stack: NumPy, SciPy, scikit-learn, Pandas, Matplotlib
+- Direct integration with the sgp4 library implementing Vallado et al. (2006)
+- FastAPI, Streamlit, and MLflow are all Python-native
+- 152 automated tests run via pytest with zero configuration
 
-### Negative / trade-offs
-- Python's Global Interpreter Lock (GIL) limits true CPU parallelism;
-  multi-satellite simulation at high tick rates may require
-  `multiprocessing` rather than `threading`
-- Interpreted language: a performance bottleneck discovered late in development may require rewriting hot paths in Cython or delegating to compiled extensions
-- Not suitable for any on-board or real-time embedded component —  Python's role is strictly ground software
+**Negative:**
+- Python's GIL limits true parallelism; mitigated by the event-driven architecture (services are I/O-bound, not CPU-bound)
+- Runtime errors not caught at compile time; mitigated by Pydantic schema validation and comprehensive test coverage
 
-### Implications for future sprints
-- Sprint 5 (MLflow, scikit-learn): fully native, no bridging required - Sprint 6 (Azure/AKS): Python Docker images are well-supported on AKS;
-  Azure ML natively tracks MLflow experiments
-- PhD integration: `sgp4` orbit truth, `numpy` signal processing, and `scipy` geometric calculations can all interoperate within the same codebase.
+---
+
+## Alternatives Considered
+
+- **Java/Kotlin:** Strong typing and concurrency, but no equivalent of scikit-learn or the sgp4 library for Python
+- **Go:** Excellent concurrency model, but scientific computing ecosystem is immature
+- **MATLAB:** Strong orbital mechanics tooling but poor support for production services, streaming, and ML deployment
+
+---
+
+## References
+
+- Harris, C. R., Millman, K. J., van der Walt, S. J., et al. (2020). Array programming with NumPy. *Nature*, 585, 357–362. https://doi.org/10.1038/s41586-020-2649-2
+- Pedregosa, F., Varoquaux, G., Gramfort, A., et al. (2011). Scikit-learn: Machine learning in Python. *Journal of Machine Learning Research*, 12, 2825–2830. http://jmlr.org/papers/v12/pedregosa11a.html
+- Ramírez, S. (2018). FastAPI framework. https://fastapi.tiangolo.com
+- Vallado, D. A., Crawford, P., Hujsak, R., & Kelso, T. S. (2006). Revisiting spacetrack report #3. *AIAA 2006-6753*. https://doi.org/10.2514/6.2006-6753
+- Van Rossum, G., & Drake, F. L. (2009). *Python 3 Reference Manual*. CreateSpace.
