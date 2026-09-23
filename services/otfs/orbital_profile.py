@@ -191,6 +191,8 @@ class OrbitalProfileExporter:
 
         # Semi-major axis from circular altitude
         a_m  = EARTH_RADIUS_M + altitude_km * 1_000.0
+        self.altitude_km = altitude_km
+        self._a_m        = a_m
         # Mean motion in radians/minute (SGP4 TLE convention)
         n_rad_min = math.sqrt(EARTH_MU / a_m**3) * 60.0
 
@@ -404,3 +406,4 @@ class OrbitalProfileExporter:
             az_deg += 360.0
 
         return range_m, el_deg, az_deg
+

@@ -51,11 +51,15 @@ from services.navigation.validator  import NavigationValidator
 
 # ── constants ─────────────────────────────────────────────────────────────────
 GROUND_STATIONS = {
-    'Cambridge, UK'    : {'lat':  52.205, 'lon':  0.119, 'alt':  20.0},
-    'Lagos, Nigeria'   : {'lat':   6.454, 'lon':  3.395, 'alt':  41.0},
-    'Houston, USA'     : {'lat':  29.760, 'lon': -95.370,'alt':  15.0},
-    'Tokyo, Japan'     : {'lat':  35.690, 'lon': 139.692,'alt':  40.0},
-    'Sydney, Australia': {'lat': -33.865, 'lon': 151.210,'alt':  20.0},
+    # LEO circular stations (Scenarios 1–3)
+    'Cambridge, UK'    : {'lat':  52.205, 'lon':   0.119, 'alt':  20.0},
+    'Lagos, Nigeria'   : {'lat':   6.454, 'lon':   3.395, 'alt':  41.0},
+    'Houston, USA'     : {'lat':  29.760, 'lon': -95.370, 'alt':  15.0},
+    'Tokyo, Japan'     : {'lat':  35.690, 'lon':  139.692,'alt':  40.0},
+    'Sydney, Australia': {'lat': -33.865, 'lon':  151.210,'alt':  20.0},
+    # Molniya HEO stations (Scenario 4) — high-latitude apogee visibility
+    'Svalbard, Norway' : {'lat':  78.229, 'lon':   15.608,'alt':  24.0},
+    'Fairbanks, Alaska': {'lat':  64.838, 'lon': -147.716,'alt': 136.0},
 }
 
 SCENARIOS = {
@@ -172,8 +176,10 @@ def get_ground_tracks(
     tracks = {}
     # Approximate orbital period based on altitude
     for sid, exp in exporters:
+        # Use the stored semi-major axis _a_m (metres) directly
+        # OrbitalProfileExporter does not expose altitude_km publicly
         period_s = 2 * math.pi * math.sqrt(
-            (6_371_000 + exp.altitude_km * 1000) ** 3 / 3.986_004_418e14
+            exp._a_m ** 3 / 3.986_004_418e14
         )
         step_s   = period_s / n_steps
         try:

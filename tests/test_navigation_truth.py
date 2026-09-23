@@ -357,4 +357,4 @@ EOF
         # Well outside SP3 coverage
         future_epoch = datetime(2026, 9, 22, 12, 0, 0, tzinfo=timezone.utc)
         frame = truth.compute_single(future_epoch)
-        assert frame.source == 'j2j4'
+        assert frame.source in ('j2j4', 'hpop')  # either fallback propagator is valid

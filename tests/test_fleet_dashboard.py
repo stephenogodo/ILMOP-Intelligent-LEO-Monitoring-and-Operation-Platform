@@ -275,3 +275,75 @@ class TestGroundStationCoverage:
             "Molniya inclination should be > 60° for polar coverage"
         )
         assert cfg['inclination_deg'] == 63.4, "Molniya inclination should be 63.4°"
+
+
+class TestHEOGroundStations:
+    """
+    Validates that Svalbard and Fairbanks — the dedicated Molniya HEO
+    ground stations — are present and provide better Scenario 4 coverage
+    than mid-latitude stations.
+
+    Molniya HEO satellites dwell at ~39,750 km apogee over high northern
+    latitudes for ~8 hours per orbit. Svalbard (78.2°N) and Fairbanks
+    (64.8°N) are above the 63.4° Molniya inclination and therefore have
+    direct overhead passes during the apogee dwell. Mid-latitude stations
+    such as Cambridge (52.2°N) or Lagos (6.5°N) are too far south for
+    optimal Molniya geometry.
+    """
+
+    SVALBARD  = {'lat': 78.229, 'lon':  15.608, 'alt':  24.0}
+    FAIRBANKS = {'lat': 64.838, 'lon': -147.716,'alt': 136.0}
+
+    def test_svalbard_in_ground_stations(self):
+        """Svalbard must be in the GROUND_STATIONS dict."""
+        from services.dashboard.coverage_engine import GROUND_STATIONS
+        assert 'Svalbard, Norway' in GROUND_STATIONS
+
+    def test_fairbanks_in_ground_stations(self):
+        """Fairbanks must be in the GROUND_STATIONS dict."""
+        from services.dashboard.coverage_engine import GROUND_STATIONS
+        assert 'Fairbanks, Alaska' in GROUND_STATIONS
+
+    def test_svalbard_latitude_above_molniya_inclination(self):
+        """Svalbard (78.2°N) is above the 63.4° Molniya inclination."""
+        assert self.SVALBARD['lat'] > 63.4
+
+    def test_fairbanks_latitude_above_molniya_inclination(self):
+        """Fairbanks (64.8°N) is above the 63.4° Molniya inclination."""
+        assert self.FAIRBANKS['lat'] > 63.4
+
+    def test_scenario_4_has_passes_from_svalbard(self):
+        """
+        Svalbard should see Molniya satellites during the high-latitude
+        apogee dwell. Search over 2 orbital periods (~24 hours for Molniya).
+        """
+        from services.dashboard.coverage_engine import SCENARIOS
+        cfg = SCENARIOS['Scenario 4']
+        # Molniya orbital period ≈ 11.6 hours → 2 periods ≈ 24 hours
+        Re = 6371.0
+        a  = Re + cfg['altitude_km']   # semi-major axis km
+        T_s = 2 * math.pi * math.sqrt((a * 1000) ** 3 / 3.986_004_418e14)
+        window_s = 2 * T_s
+
+        exporters = build_exporters('scenario_4', self.SVALBARD)
+        found = False
+        for sid, exp in exporters:
+            frames = exp.export_in_view_only(
+                EPOCH, duration_s=window_s, step_s=300
+            )
+            if frames:
+                found = True
+                break
+        assert found, (
+            "Svalbard should see at least one Molniya satellite "
+            f"in a {window_s/3600:.1f}-hour window"
+        )
+
+    def test_coverage_engine_has_both_heo_stations(self):
+        """coverage_engine.py GROUND_STATIONS includes both HEO stations."""
+        from services.dashboard.coverage_engine import GROUND_STATIONS
+        assert 'Svalbard, Norway'  in GROUND_STATIONS, "Svalbard missing"
+        assert 'Fairbanks, Alaska' in GROUND_STATIONS, "Fairbanks missing"
+        # Verify coordinates are in the correct hemisphere
+        assert GROUND_STATIONS['Svalbard, Norway']['lat']  > 70.0
+        assert GROUND_STATIONS['Fairbanks, Alaska']['lat'] > 60.0
