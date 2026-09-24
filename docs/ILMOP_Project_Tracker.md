@@ -1,9 +1,10 @@
-# ILMOP — Live Project Tracker
+# ILMOP Project Tracker
 
 **Project:** Intelligent LEO Monitoring and Operation Platform
-**Current version:** v0.4.0-beta (post Sprint 4)
-**Last updated:** 2026-09-08
-**Tracking:** update this file at the close of every session
+**GitHub:** github.com/stephenogodo/ILMOP-Intelligent-LEO-Monitoring-and-Operation-Platform
+**Current version:** v0.6.0-beta (Sprint 6 complete)
+**Last updated:** September 2026
+**Total tests passing:** 281/281 (1 skipped)
 
 ---
 
@@ -11,231 +12,253 @@
 
 | Sprint | Version | Title | Status | Tests |
 |--------|---------|-------|--------|-------|
-| 1 | v0.2.0-alpha | Dynamic Spacecraft Telemetry Simulator | ✅ Complete | 4 → 43 |
-| 2 | v0.2.1-alpha | Simulator Physics Upgrade | ✅ Complete | 43/43 |
-| 3 | v0.3.0-alpha | Streaming Telemetry Platform | ✅ Complete | 57/57 |
-| 4 | v0.4.0-beta | Telemetry Data Platform — API and Dashboard | ✅ Complete | 75/75 |
-| 5 | v0.5.0-beta | Intelligent Digital Twin — AI/ML | ✅ Complete | 116/116 |
-| 6 | v0.6.0-beta | Demonstration Layer — Fleet Dashboard, HPOP, Coverage, Four Scenarios | ⬅ Next | — |
-| 7 | v1.0.0 | Cloud-Native Platform — Azure AKS, ILP Scheduler, Molniya Standalone | Pending | — |
+| 1 | v0.2.0-alpha | Dynamic Spacecraft Telemetry Simulator | ✅ Complete | 43/43 |
+| 2 | v0.2.1-alpha | Simulator Physics Upgrade (SGP4, eclipse) | ✅ Complete | 43/43 |
+| 3 | v0.3.0-alpha | Streaming Telemetry Platform (Kafka, TimescaleDB) | ✅ Complete | 57/57 |
+| 4 | v0.4.0-beta | Telemetry Data Platform (FastAPI, Streamlit, Redis) | ✅ Complete | 75/75 |
+| 5 | v0.5.0-beta | Intelligent Digital Twin (AI/ML anomaly detection) | ✅ Complete | 152/152 |
+| 6 | v0.6.0-beta | Demonstration Layer (OTFS waveform, navigation, fleet dashboard) | ✅ Complete | 281/281 |
+| 7 | v1.0.0 | Cloud-Native Platform (Azure AKS, ILP scheduler) | ⬅ Next | — |
 
 ---
 
-## Constellation architecture (agreed design)
+## Sprint 1 — Completed deliverables
 
-Four progressive demonstration scenarios — each runnable independently
-via `python run_demo.py --scenario N --speed M`.
+| # | Deliverable | File | Notes |
+|---|---|---|---|
+| 1 | SGP4 orbit model | `services/satellite_simulator/orbit.py` | Vallado et al. (2006) implementation via Rhodes sgp4 library |
+| 2 | Battery physics model | `services/satellite_simulator/battery.py` | Eclipse-aware charge/discharge |
+| 3 | Thermal physics model | `services/satellite_simulator/thermal.py` | Rician-like sinusoidal swing |
+| 4 | Telemetry Pydantic schema | `shared/schemas/telemetry.py` | Typed, JSON-serialisable |
+| 5 | Scenario configuration YAML | `config/scenarios/` | 4 constellation scenarios |
+| 6 | Sprint 1 tests | `tests/orbit_test.py`, `tests/battery_test.py`, `tests/thermal_test.py` | 43 tests |
 
-| Scenario | Orbit type | Planes | Satellites/plane | Total | Primary purpose |
-|----------|-----------|--------|-----------------|-------|-----------------|
-| 1 | LEO circular | 1 | 1 | 1 | Pipeline baseline, anomaly detection training |
-| 2 | LEO circular | 1 | 6 | 6 | Navigation demonstration, contact frequency |
-| 3 | LEO circular | 4 | 6 | 24 | Operational scale, multi-plane scheduling |
-| 4 | HEO Molniya | 1 | 6 | 6 | Polar coverage, standalone — never mixed with LEO data |
+---
 
-**Scenarios 1–3** share LEO_CIRCULAR orbit type and a common ML training dataset.
-**Scenario 4** is a fully separate experiment with its own HEO_MOLNIYA ML model,
-its own training dataset, and its own ground station configuration (Svalbard + Fairbanks).
+## Sprint 2 — Completed deliverables
 
-**Molniya parameters:** inclination 63.4° (critical angle — zero apsidal precession),
-eccentricity 0.74, argument of perigee 270° (apogee fixed over northern hemisphere),
-perigee altitude 500 km, apogee altitude 39,750 km, period ~12 hours.
-6 satellites spaced 60° apart in mean anomaly provide continuous polar coverage
-with simultaneous dual-satellite visibility for antenna handover demonstration.
+| # | Deliverable | File | Notes |
+|---|---|---|---|
+| 1 | Eclipse-aware battery model | `services/satellite_simulator/battery.py` | Cylindrical shadow model; Montenbruck & Gill (2000) Alg 29 |
+| 2 | TEMP_MAX_C raised to 120°C | `services/satellite_simulator/thermal.py` | Fault was stabilising at 72°C due to cap conflict |
+| 3 | State persistence | `data/sim_state/{sat_id}.json` | Battery/thermal state survives process restart |
+| 4 | Fault injection (`--fault`) | `run_demo.py` | battery_degradation, thermal_runaway, panel_degradation |
+| 5 | `--speed` multiplier | `run_demo.py` | Default 10×; timestamps remain realistic |
+| 6 | ThermalModel internal state sync | `services/satellite_simulator/telemetry.py` | Fault sync back into model |
 
 ---
 
 ## Sprint 3 — Completed deliverables
 
-| Deliverable | File | Notes |
-|---|---|---|
-| Docker Compose fix | `infrastructure/docker-compose.yml` | Fixed nested `environment:` bug, CRLF endings, `ilmov→ilmop` typo, added Kafka healthcheck, top-level `volumes:` block |
-| Central config | `shared/config.py` | pydantic-settings; all env vars; `telemetry_topic()` and `alarms_topic()` helpers |
-| Kafka producer rewrite | `services/kafka_producer/producer.py` | `satellite_id` as message key, topic from config, structured logging |
-| Kafka consumer rewrite | `services/kafka_consumer/consumer.py` | Pydantic schema validation, structured logging, clean error handling |
-| TimescaleDB sink | `services/telemetry_sink/sink.py` | Batched writes, idempotent INSERT, manual Kafka offset commit |
-| TimescaleDB schema | `services/telemetry_sink/schema.sql` | Hypertable, 3 indexes, 5-min continuous aggregate |
-| Config tests | `tests/config_test.py` | 7 tests including env-var override |
-| Sink unit tests | `tests/sink_test.py` | 7 tests for `_parse()` — no live Kafka/DB required |
-| New dependencies | `requirements.txt` | `psycopg2-binary==2.9.12`, `pydantic-settings==2.15.0` |
+| # | Deliverable | File | Notes |
+|---|---|---|---|
+| 1 | Apache Kafka (KRaft mode) | `infrastructure/docker-compose.yml` | No ZooKeeper; wildcard topic subscription |
+| 2 | Telemetry sink | `services/telemetry_sink/sink.py` | Batch insert to TimescaleDB |
+| 3 | TimescaleDB hypertable | `infrastructure/init.sql` | 1-hour chunk interval; compression policy |
+| 4 | Kafka producer in simulator | `services/satellite_simulator/telemetry.py` | One topic per satellite |
+| 5 | `shared/config.py` | `shared/config.py` | pydantic-settings; environment variables |
+| 6 | Multi-satellite scenarios | `config/scenarios/scenario_3.yaml` | 24-satellite 4-plane Walker delta |
 
 ---
 
 ## Sprint 4 — Completed deliverables
 
-| Deliverable | File | Notes |
-|---|---|---|
-| FastAPI application | `services/api/main.py` | Lifespan, asyncpg pool, CORS, router registration |
-| DB layer | `services/api/db.py` | `get_pool()` dependency — asyncpg pool injection |
-| Redis cache | `services/api/cache.py` | Optional Redis client; graceful fallback if unavailable |
-| Health router | `services/api/routers/health.py` | `GET /health` — liveness + DB connectivity |
-| Satellites router | `services/api/routers/satellites.py` | `GET /satellites` — active fleet list |
-| Telemetry router | `services/api/routers/telemetry.py` | `GET /telemetry/{sat}/latest`, history, 5-min summary |
-| Streamlit dashboard | `services/dashboard/app.py` | Live metrics, ground track map, trending charts, auto-refresh |
-| Redis service | `infrastructure/docker-compose.yml` | `redis:7-alpine`, cache profile |
-| API tests | `tests/api_test.py` | 18 tests — all endpoints, 404 cases, field validation |
-| New dependencies | `requirements.txt` | fastapi, uvicorn, asyncpg, streamlit, redis, httpx2 |
+| # | Deliverable | File | Notes |
+|---|---|---|---|
+| 1 | FastAPI REST layer | `services/api/main.py` | OpenAPI 3.0 at /docs; Fielding (2000) REST |
+| 2 | Streamlit operator dashboard | `services/dashboard/app.py` | 6-second refresh default; `st.empty()` alarm panel |
+| 3 | Redis cache | `infrastructure/docker-compose.yml` | Response caching for API |
+| 4 | Alarm schema | `shared/schemas/alarm.py` | CRITICAL/WARNING severity; Pydantic v2 |
+| 5 | Anomaly detector stub | `services/anomaly_detection/detector.py` | Placeholder for Sprint 5 |
+| 6 | Timestamp fix | `services/dashboard/app.py` | KeyError 'time'→'timestamp' |
 
 ---
 
 ## Sprint 5 — Completed deliverables
 
-| Deliverable | File | Notes |
-|---|---|---|
-| Telemetry schema v2.1 | `shared/schemas/telemetry_schema.py` | `orbit_type` + `fault_injected` fields; backward compatible |
-| TimescaleDB schema v2.1 | `services/telemetry_sink/schema.sql` | New columns, orbit_type index, alarms hypertable, retention + compression policies |
-| Sink updated | `services/telemetry_sink/sink.py` | Writes new fields; schema_version 2.1 |
-| Alarm schema v1.0 | `shared/schemas/alarm_schema.py` | 14-field Pydantic Alarm model |
-| TelemetryGenerator v2 | `services/satellite_simulator/telemetry.py` | orbit_type, time_multiplier, fault injection, simulated time cursor |
-| Fault injector | `services/satellite_simulator/telemetry.py` | BATTERY_DEGRADATION, THERMAL_RUNAWAY, SAFE_MODE_TRIGGER |
-| Constellation YAML files | `config/constellations/scenario_1–4.yaml` | All four scenarios fully defined |
-| ConstellationManager | `services/satellite_simulator/constellation.py` | Loads YAML, instantiates N generators, generate_all() |
-| Demo runner | `run_demo.py` | --scenario 1–4 --speed N --fault type |
-| Feature engineering | `services/anomaly_detection/features.py` | 10 eclipse-correlated features |
-| MLflow training pipeline | `services/anomaly_detection/train.py` | Isolation Forest + MLflow; separate experiment per orbit_type |
-| Anomaly detection service | `services/anomaly_detection/detector.py` | Model router by orbit_type, Kafka consumer, alarm publisher |
-| Alarms API endpoint | `services/api/routers/alarms.py` | GET /alarms/{sat_id} with severity filter |
-| Dashboard alarm panel | `services/dashboard/app.py` | Live alarm display, severity colour-coding |
-| Config update | `shared/config.py` | mlflow_tracking_uri added |
-| Tests | `tests/constellation_test.py`, `tests/alarm_schema_test.py`, `tests/anomaly_test.py` | 41 new tests; 116/116 total |
-
----
-
-## Sprint 6 — Scope (Pending)
-
-**Goal:** A live, compelling, multi-scenario demonstration of ILMOP
-from one satellite to 24; sub-100-metre navigation truth reference
-replacing SGP4 for the PhD navigation validation pipeline; fleet
-dashboard showing all satellites simultaneously on a world map.
-
-| # | Deliverable | File(s) | Notes |
+| # | Deliverable | File | Notes |
 |---|---|---|---|
-| 1 | NavigationTruthModel | `services/satellite_simulator/navigation_truth.py` | poliastro HPOP with EGM2008 gravity + NRLMSISE-00 drag + lunisolar perturbations; 1–10 m accuracy vs SGP4's 100–500 m |
-| 2 | SP3 ephemeris parser | `services/satellite_simulator/sp3_parser.py` | Parse IGS SP3 precise ephemeris files; 10–50 m accuracy; faster alternative to full HPOP |
-| 3 | Navigation validation pipeline | `services/navigation/validator.py` | Compares OFDM ranging solution against NavigationTruthModel; computes residuals, RMS, GDOP |
-| 4 | Fleet dashboard page | `services/dashboard/app.py` | All satellites plotted simultaneously on world map; colour-coded by orbit type and health status |
-| 5 | Coverage statistics | `services/dashboard/pages/coverage.py` | Contact fraction, revisit time, simultaneous visibility per scenario; Scenario 1→3 comparison table |
-| 6 | Four-scenario demonstration | `run_demo.py` (complete) | End-to-end verified: Scenario 1→2→3→4 each runnable cleanly; dashboard updates correctly for each |
-| 7 | Scenario transition test | `tests/scenario_test.py` | Verify ConstellationManager correctly instantiates all four configurations |
-| 8 | ADR-017 | `docs/adr/ADR-017-hpop-navigation-truth-model.md` | Orbit model accuracy hierarchy: SGP4 (operations) vs HPOP/SP3 (navigation truth); why the separation matters for PhD peer-review credibility |
-| 9 | ADD + tracker update | — | After Sprint 6 completion |
+| 1 | Isolation Forest model | `services/anomaly_detection/train.py` | Liu et al. (2008, 2012); contamination=0.01 |
+| 2 | Hybrid detector (Layer 1 + Layer 2) | `services/anomaly_detection/detector.py` | Layer 1: limit-check; Layer 2: IF score |
+| 3 | MLflow experiment tracking | `services/anomaly_detection/` | Zaharia et al. (2018); file store backend |
+| 4 | Standing alarm suppression | `services/anomaly_detection/detector.py` | 60 sim-second suppression window |
+| 5 | NaN sentinel fix | `services/anomaly_detection/detector.py` | -1.0 sentinel for limit-check alarms |
+| 6 | Training SQL health filter | `services/anomaly_detection/train.py` | battery_pct>5, temp<50 |
+| 7 | Dynamic log in run_demo.py | `run_demo.py` | Shows batt+temp regardless of fault type |
+| 8 | ADR-001 to ADR-016 citations | `docs/adr/` | Academic citations retrofitted to all 16 ADRs |
+| 9 | ADR-018 | `docs/adr/ADR-018-python-for-otfs-waveform-implementation.md` | Python over MATLAB for OTFS layer |
 
-**Key architectural principle for Sprint 6:**
-SGP4 is retained as the operational orbit model throughout ILMOP.
-`NavigationTruthModel` (HPOP) is used exclusively in the navigation
-validation pipeline. The paper states this explicitly: "SGP4 is used
-for operational orbit determination and contact scheduling.
-HPOP is used as the truth reference for navigation accuracy validation,
-providing approximately X-metre reference accuracy against which the
-OFDM ranging solution's Y-metre residuals are evaluated."
+**Sprint 5 documentation:**
+- Supervisor Briefing v3.0 (corrected OTFS-ISAC demonstration status and channel model)
+- Training Manual v1.8
+- CV updated (Azure and CI/CD removed; PhD bullet corrected)
 
 ---
 
-## Sprint 7 — Scope (Pending)
+## Sprint 6 — Completed deliverables
 
-**Goal:** Full cloud-native deployment on Azure; ILP ground station
-scheduler replacing the ContactModel timer; Molniya Scenario 4
-standalone demonstration from end to end.
-
-| # | Deliverable | File(s) | Notes |
+| # | Deliverable | File | Tests |
 |---|---|---|---|
-| 1 | Azure AKS deployment | `infrastructure/k8s/` | Helm charts for all 6–8 services; autoscaling node pools |
-| 2 | Azure Event Hubs migration | `shared/config.py` | Bootstrap server → Event Hubs endpoint; zero application code changes |
-| 3 | Azure PostgreSQL migration | `shared/config.py` | Connection string → Azure Database for PostgreSQL + TimescaleDB extension |
-| 4 | Azure Container Registry | `infrastructure/acr/` | Push all Docker images; AKS pulls from ACR |
-| 5 | Azure Key Vault | `infrastructure/keyvault/` | Secrets (DB password, Event Hubs connection string) out of environment variables |
-| 6 | ILP ground station scheduler | `services/scheduler/scheduler.py` | PuLP-based ILP; computes contact windows from SGP4 + ground station positions; resolves antenna conflicts; publishes to `passes.schedule` Kafka topic |
-| 7 | Ground station config | `config/ground_stations.yaml` | At minimum: Svalbard (78°N), Fairbanks (65°N), Maspalomas (28°N), Santiago (33°S), Perth (32°S) |
-| 8 | Molniya Scenario 4 standalone | `run_demo.py --scenario 4` | Full end-to-end: 6 Molniya satellites, Svalbard + Fairbanks ground stations, long-dwell contact windows, HEO anomaly detection model, polar coverage map |
-| 9 | Per-orbit-type model registry | `services/anomaly_detection/` | MLflow model registry with separate LEO and HEO production models; routing confirmed working for all four scenarios |
-| 10 | ADR-018 | `docs/adr/ADR-018-azure-cloud-platform.md` | Why Azure over AWS/GCP: Event Hubs Kafka compatibility (zero code change), native TimescaleDB on PostgreSQL Flexible Server |
-| 11 | ADR-019 | `docs/adr/ADR-019-ilp-ground-station-scheduler.md` | Why ILP (PuLP) over greedy heuristics and metaheuristics for 24-satellite / 5-station problem |
-| 12 | ADD + tracker final update | — | Final version — project complete |
+| 1 | Orbital profile exporter | `services/otfs/orbital_profile.py` | 18/18 |
+| 2 | OTFS channel emulator | `services/otfs/channel_emulator.py` | 29/29 |
+| 3 | Navigation truth model (HPOP) | `services/navigation/navigation_truth.py` | 26/26 |
+| 4 | Navigation validation pipeline | `services/navigation/validator.py` | 34/34 |
+| 5 | Fleet dashboard | `services/dashboard/pages/fleet_dashboard.py` | 19/19 |
+| 6 | Coverage statistics | `services/dashboard/coverage_engine.py` + `pages/coverage_statistics.py` | 26/26 |
+| 7 | ADR-017 | `docs/adr/ADR-017-hpop-navigation-truth-model.md` | — |
 
-**Estimated Azure monthly cost (Tier 2 dev/test):** ~$152/month on-demand;
-~$26/month if stopped when not in use (4 hours/day active).
-Covered by Azure free credits ($200) for the first month.
-Use Azure for Students ($100/year) for ongoing development.
+**Validation scripts:**
+- `validate_channel_emulator.py` — 8/8 physics checks
+- `validate_navigation_validator.py` — 9/9 physics checks
+
+**Sprint 6 validated results:**
+
+| Metric | Result |
+|---|---|
+| Channel emulator FSPL at zenith | 156.19 dB (theory 155.1 dB ✓) |
+| Channel emulator Doppler (59° pass) | ±51.9 kHz (theory ±52 kHz ✓) |
+| Navigation RMS — Cambridge | 9.992 m |
+| Navigation RMS — Lagos (upper bound) | 8.866 m (87.4° max elevation) |
+| Navigation theoretical upper bound | 6.16 m (finite SNR) / 4.33 m (quantisation floor) |
+| Navigation bias | 0.123 m (Cambridge), −1.481 m (Lagos) |
+| GDOP at max elevation (Cambridge 59°) | 1.167 = 1/sin(59°) ✓ |
+| Coverage S1 → S3 improvement | 6.6% → 51.2% contact fraction (7.8×) |
+| Truth source | HPOP (J2+J3+J4+J5+J6, ~3–5 m accuracy) |
+
+**Sprint 6 documentation:**
+- Supervisor Briefing v4.0
+- Training Manual v1.9
+- ADR-017 (HPOP Navigation Truth Model)
+- Navigation validation reports (theoretical UB / Lagos UB / Cambridge deployment case)
 
 ---
 
-## Open risks
+## Sprint 7 — Scope
+
+**Version:** v1.0.0
+**Title:** Cloud-Native Platform
+
+| # | Deliverable | File | Notes |
+|---|---|---|---|
+| 1 | Azure AKS Kubernetes manifests | `infrastructure/k8s/` | All 7 ILMOP services as Kubernetes deployments |
+| 2 | Azure Event Hubs (Kafka-compatible) | `infrastructure/k8s/` | Zero code change — Kafka wire protocol |
+| 3 | Azure Database for PostgreSQL (TimescaleDB) | `infrastructure/k8s/` | Flexible Server with TimescaleDB extension |
+| 4 | Azure Blob Storage + MLflow | `infrastructure/k8s/` | MLflow tracking server backend |
+| 5 | ILP ground station scheduler | `services/scheduler/ilp_scheduler.py` | Replaces contact timer; multi-station, multi-satellite |
+| 6 | ContactModel geometry-driven | `services/satellite_simulator/contact.py` | Elevation-angle-based window detection |
+| 7 | Molniya Scenario 4 demo | `run_demo.py` | Svalbard + Fairbanks ground stations |
+| 8 | Four-scenario progressive demo | `run_demo.py` | Scenario 1→2→3→4 end-to-end |
+| 9 | ADR-019 | `docs/adr/ADR-019-azure-cloud-platform.md` | Azure AKS rationale |
+| 10 | ADR-020 | `docs/adr/ADR-020-ilp-ground-station-scheduler.md` | ILP over contact timer |
+| 11 | ADD + tracker update | — | After Sprint 7 completion |
+
+**Key architectural note (ILP vs contact timer):**
+ILP adds value only when there are scheduling choices to make — multiple satellites
+competing for multiple ground stations simultaneously. For Scenarios 1–2, the contact
+timer is correct (one satellite, trivial scheduling). ILP earns its complexity in
+Sprint 7 with Scenario 3 (24 sats) and Scenario 4 (Molniya dual-station: Svalbard +
+Fairbanks). See ADR-020.
+
+**Ground station parametrisation (Sprint 6 action, Sprint 7 dependency):**
+The navigation validation pipeline passes ground station position as a parameter.
+The ILP scheduler can pass the selected station coordinate without touching navigation
+code. This decoupling was built in Sprint 6. ✅
+
+---
+
+## Risk register
 
 | ID | Risk | Likelihood | Impact | Status | Mitigation |
-|----|------|-----------|--------|--------|------------|
+|---|---|---|---|---|---|
 | R1 | ~~Docker Compose YAML bug blocks Sprint 3~~ | ~~High~~ | ~~High~~ | ✅ Closed | Fixed in Sprint 3 |
-| R2 | ~~Simulator has no fast-forward mode~~ | ~~High~~ | ~~High~~ | ✅ Closed | `--speed` flag added in Sprint 5 |
+| R2 | ~~Simulator has no fast-forward mode~~ | ~~High~~ | ~~High~~ | ✅ Closed | `--speed` flag added Sprint 5 |
 | R3 | ~~Kafka producer has no key — multi-satellite ordering breaks~~ | ~~High~~ | ~~Medium~~ | ✅ Closed | Fixed in Sprint 3 |
-| R4 | Schema v2 breaks legacy CSV export | Low | Low | **Open** | Alpha stage — acceptable; note in CHANGELOG |
-| R5 | ~~No fault injection — model trained on nominal data only~~ | ~~High~~ | ~~High~~ | ✅ Closed | Fault injection implemented in Sprint 5 |
-| R6 | MLflow schema version coupling not enforced | Medium | High | **Open** | Tag schema_version, orbit_type, scenario in every MLflow run from day one |
-| R7 | ~~`shared/config.py` absent; Docker networking failures silent~~ | ~~High~~ | ~~Medium~~ | ✅ Closed | Created in Sprint 3 |
-| R8 | Markdown documentation stubs remain empty | Medium | Medium | **Partially closed** | ADD and ADRs populated; 14 other stubs still pending |
-| R9 | Azure cost overrun in Sprint 7 | Low | Medium | **Open** | Size AKS for dev/test; stop compute when not in use; use free credits first |
-| R10 | Redis cache adds operational complexity | Low | Low | **Open** | Use Redis only for latest-record cache; graceful fallback already implemented |
-| R11 | ~~LEO and HEO training data mixed~~ | ~~High~~ | ~~High~~ | ✅ Closed | orbit_type field enforced in schema v2.1 + TimescaleDB query filter |
-| R12 | SGP4 reference accuracy (100–500 m) insufficient to validate sub-100-metre navigation claims | High | High | **Open** | Build NavigationTruthModel (poliastro HPOP, 1–10 m accuracy) in Sprint 6 before navigation paper is written |
-| R13 | Molniya near-perigee SGP4 error (km-level) contaminates positioning demonstration | Medium | High | **Open** | Navigation demonstration restricted to Scenario 2 LEO only; Molniya used for remote sensing only |
+| R4 | ~~Isolation Forest contamination=0.05 causes false alarms~~ | ~~High~~ | ~~High~~ | ✅ Closed | contamination=0.01 Sprint 5 |
+| R5 | ~~Anomaly detection trained on nominal data only~~ | ~~High~~ | ~~High~~ | ✅ Closed | Fault injection + two-layer detector Sprint 5 |
+| R6 | Azure cost overrun in Sprint 7 | Low | Medium | Open | Size AKS for dev/test; stop compute when not in use |
+| R7 | ~~`shared/config.py` absent; Docker networking failures~~ | ~~High~~ | ~~Medium~~ | ✅ Closed | Created Sprint 3 |
+| R8 | poliastro API version incompatibility | Medium | High | ✅ Closed | 0.7.0 API fixed Sprint 6; cowell() + ad= pattern documented |
+| R9 | SGP4 truth accuracy insufficient for navigation papers | High | High | ✅ Closed | HPOP J2–J6 truth model built Sprint 6 (ADR-017) |
+| R10 | ~~LEO/HEO training data mixed~~ | ~~High~~ | ~~High~~ | ✅ Closed | orbit_type filter + separate models ADR-016 |
+| R11 | OTFS guard region contamination under timing error | Medium | High | Open | Adaptive guard region with safety margin δ — Contribution 2 |
+| R12 | 3D position fix not achieved from Cambridge | Low | Medium | Open | Cambridge 0.6° above inclination; use Lagos or lower-latitude station |
+| R13 | ILP solver infeasible for large Scenario 3 windows | Low | Medium | Open | Time-limit the solver; fall back to greedy if no solution in 5s |
 
 ---
 
 ## ADR register
 
 | ADR | Decision | Sprint | Status |
-|-----|----------|--------|--------|
-| ADR-001 | Python as primary language | 1 | Accepted |
-| ADR-002 | Pydantic v2 for schema validation | 1 | Accepted |
-| ADR-003 | Apache Kafka as event streaming backbone | 1 | Accepted |
-| ADR-004 | TimescaleDB for time-series storage | 1 | Accepted |
-| ADR-005 | confluent-kafka Python client | 1 | Accepted |
-| ADR-006 | SGP4 for orbit propagation | 2 | Accepted |
-| ADR-007 | Eclipse-aware battery and thermal physics | 2 | Accepted |
-| ADR-008 | Cylindrical shadow model for eclipse detection | 2 | Accepted |
-| ADR-009 | Satellite dataclass as stateful domain object | 2 | Accepted |
-| ADR-010 | pydantic-settings for configuration management | 3 | Accepted |
-| ADR-011 | psycopg2 for TimescaleDB sink driver | 3 | Accepted |
-| ADR-012 | FastAPI as REST API framework | 4 | Accepted |
-| ADR-013 | Streamlit as operator dashboard | 4 | Accepted |
-| ADR-014 | Isolation Forest for anomaly detection | 5 | Accepted |
-| ADR-015 | MLflow for experiment tracking | 5 | Accepted |
-| ADR-016 | LEO/HEO training data separation | 5 | Accepted |
-| ADR-017 | HPOP NavigationTruthModel vs SGP4 for navigation validation | 6 | Planned |
-| ADR-018 | Azure as cloud deployment platform | 7 | Planned |
-| ADR-019 | ILP (PuLP) for ground station scheduler | 7 | Planned |
+|---|---|---|---|
+| ADR-001 | Python as primary development language | 1 | ✅ Accepted |
+| ADR-002 | Pydantic v2 for schema validation | 1 | ✅ Accepted |
+| ADR-003 | Apache Kafka event streaming backbone | 3 | ✅ Accepted |
+| ADR-004 | TimescaleDB time-series storage | 3 | ✅ Accepted |
+| ADR-005 | confluent-kafka Python client | 3 | ✅ Accepted |
+| ADR-006 | SGP4 orbit propagation | 2 | ✅ Accepted |
+| ADR-007 | Eclipse-aware physics models | 2 | ✅ Accepted |
+| ADR-008 | Cylindrical shadow eclipse model | 2 | ✅ Accepted |
+| ADR-009 | Satellite state as Pydantic dataclass | 1 | ✅ Accepted |
+| ADR-010 | pydantic-settings configuration | 1 | ✅ Accepted |
+| ADR-011 | psycopg2 database driver | 3 | ✅ Accepted |
+| ADR-012 | FastAPI REST layer | 4 | ✅ Accepted |
+| ADR-013 | Streamlit operator dashboard | 4 | ✅ Accepted |
+| ADR-014 | Isolation Forest anomaly detection | 5 | ✅ Accepted |
+| ADR-015 | MLflow experiment tracking | 5 | ✅ Accepted |
+| ADR-016 | LEO/HEO training separation | 5 | ✅ Accepted |
+| ADR-017 | HPOP navigation truth model (J2–J6) | 6 | ✅ Accepted |
+| ADR-018 | Python for OTFS waveform implementation | 5 | ✅ Accepted |
+| ADR-019 | Azure as cloud deployment platform | 7 | Planned |
+| ADR-020 | ILP ground station scheduler | 7 | Planned |
+
+All ADRs 001–018 include academic citations.
 
 ---
 
-## Publication pipeline (emerging from project + PhD work)
+## Key commands reference
 
+```powershell
+# Environment
+$env:COMPOSE_FILE = "C:\Users\Admin\Documents\Projects\ILMOP\infrastructure\docker-compose.yml"
+$env:MLFLOW_ALLOW_FILE_STORE = "true"
 
-## Document register
+# Start infrastructure
+docker compose --profile streaming --profile database --profile cache up -d
 
-| Doc ID | Title | Location | Status |
-|--------|-------|----------|--------|
-| DOC-007 | Architecture Design Document (ADD) | `docs/.../markdown/DOC-007-ADD.md` | ✅ Active — v0.4.0 |
-| ADR index | All ADRs (ADR-001 to ADR-013 complete) | `docs/adr/` | ✅ Active |
-| Others (DOC-001 to DOC-015 excl. DOC-007) | Various | `docs/.../markdown/` | Stubs — populate each sprint |
+# Sprint 5 — fault injection demonstration
+Remove-Item -Force data\sim_state\SAT-A1.json -ErrorAction SilentlyContinue
+docker exec -i ilmop-timescaledb psql -U ilmop -d ilmop -c "TRUNCATE TABLE alarms;"
+python run_demo.py --scenario 1 --fault battery_degradation --speed 10
+
+# Sprint 6 — channel emulator validation
+python validate_channel_emulator.py
+
+# Sprint 6 — navigation validation
+python validate_navigation_validator.py
+
+# Sprint 6 — fleet dashboard
+streamlit run services/dashboard/pages/fleet_dashboard.py
+
+# Sprint 6 — coverage statistics
+streamlit run services/dashboard/pages/coverage_statistics.py
+
+# Full test suite
+python -m pytest tests/ -v
+
+# Retrain model
+python -m services.anomaly_detection.train --orbit-type LEO_CIRCULAR
+```
 
 ---
 
-## Session log
+## Document versions
 
-| Date | Sprint | What was done |
-|------|--------|---------------|
-| 2026-08-25 | 1–2 | Initial codebase analysis; Sprint 2 physics upgrade (SGP4, eclipse-aware models); 43 tests |
-| 2026-08-25 | 2 | ADR-001 through ADR-009 written |
-| 2026-08-25 | 3 | Sprint 3 complete: Docker fix, config, producer/consumer rewrite, TimescaleDB sink, 57 tests |
-| 2026-08-25 | 3 | ADR-010, ADR-011, ADD (DOC-007), project tracker created |
-| 2026-08-25 | 4 | Sprint 4 complete: FastAPI, Streamlit, Redis, 75 tests; ADR-012, ADR-013, ADD updated |
-| 2026-09-08 | — | Brainstorming: constellation architecture (4 scenarios), Molniya HEO design, LEO/HEO ML separation, HPOP navigation truth, publication pipeline, sprint renumbering (5.5→6, 6→7) |
-| 2026-09-11 | 5 | Sprint 5 complete: schema v2.1, ConstellationManager, 4 scenario YAMLs, run_demo.py, Isolation Forest, MLflow, fault injection, alarms API, dashboard alarm panel, 116/116 tests |
+| Document | Version | Date | Location |
+|---|---|---|---|
+| Supervisor Briefing | v4.0 | Sep 2026 | ILMOP_Supervisor_Briefing_v4.docx |
+| Training Manual | v1.9 | Sep 2026 | ILMOP_Training_Manual_v1.9.docx |
+| Concept of Operations | v1.5 | Sep 2026 | docs/ConOps/ |
+| Architecture Design Document | v0.6.0 | Sep 2026 | docs/ADD/ |
+| Navigation Validation Report | v2 (final) | Sep 2026 | Report2v2_Navigation_Three_Level_Final.docx |
+| Channel Emulator Validation Report | v1 | Sep 2026 | Report1_Channel_Emulator_Validation.docx |
 
----
-
-## Next session opening checklist
-
-Before writing any code, confirm:
-- [ ] Upload latest `ILMOP.zip` to sandbox
-- [ ] Run `python -m pytest tests/ -q` — all 75 tests must pass
-- [ ] State which sprint and task we are starting
-- [ ] Confirm `--speed` flag is first Sprint 5 task before any model training begins
