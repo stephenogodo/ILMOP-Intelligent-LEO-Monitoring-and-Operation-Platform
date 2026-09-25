@@ -1,0 +1,53 @@
+# Version control
+.git
+.gitignore
+
+# Python artefacts
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv
+venv
+env
+ENV
+
+# Development tools
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov/
+*.log
+
+# Local environment files — secrets must never enter an image
+.env
+.env.*
+!.env.example
+
+# MLflow — models are mounted as a volume or read from Azure Blob at runtime
+mlruns/
+mlartifacts/
+
+# Documentation and non-runtime files
+docs/
+scripts/
+*.md
+*.txt
+!requirements.txt
+
+# OS artefacts
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.iml
