@@ -74,3 +74,5 @@ training_manual/
 
 data/sim_state/
 score_test.py
+
+docs/private/
