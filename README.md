@@ -16,21 +16,22 @@ simulation, real-time event streaming, time-series persistence, REST API
 delivery, and AI-assisted anomaly detection — all running as independent,
 loosely coupled microservices connected by an Apache Kafka event backbone.
 
-The platform is simultaneously a software engineering portfolio project 
-demonstrating scalable cloud-native architecture, a research instrument 
+The platform is simultaneously a **software engineering portfolio project**
+demonstrating scalable cloud-native architecture, a **research instrument**
 providing the operational ground segment for a PhD programme in OTFS-ISAC
-waveform design for Integrated Satellite Communication, Navigation, and 
-Remote Sensing (ISAC), and a progressive scalability demonstration showing 
-the same architecture handling one satellite through a 24-satellite multi-plane 
-constellation without structural change. The research instrument role is backed 
-by a dedicated waveform layer implementing the complete OTFS signal model 
-(ISFFT/Heisenberg transmitter, Wigner-Ville receiver), a novel three-function pilot
-frame that simultaneously enables broadband communication, pseudorange navigation, 
-and target echo sensing from a single pilot symbol, and an adaptive orbital guard 
-region sized to the satellite's instantaneous Doppler shift. Navigation accuracy is 
-validated at 9.99 m RMS pseudorange (Cambridge, 52.2°N) and 8.87 m (Lagos, 6.5°N) 
-against a J2–J6 high-precision orbital truth reference. The waveform layer carries 
-129/129 passing tests; combined platform and waveform tests total 410/410 with zero warnings.
+waveform design for Integrated Satellite Communication, Navigation, and Remote
+Sensing (ISAC), and a **progressive scalability demonstration** showing the same
+architecture handling one satellite through a 24-satellite multi-plane
+constellation without structural change. The research instrument role is backed
+by a dedicated waveform layer implementing the complete OTFS signal model
+(ISFFT/Heisenberg transmitter, Wigner-Ville receiver), a novel three-function
+pilot frame that simultaneously enables broadband communication, pseudorange
+navigation, and target echo sensing from a single pilot symbol, and an adaptive
+orbital guard region sized to the satellite's instantaneous Doppler shift.
+Navigation accuracy is validated at 9.99 m RMS pseudorange (Cambridge, 52.2°N)
+and 8.87 m (Lagos, 6.5°N) against a J2–J6 high-precision orbital truth
+reference. The waveform layer carries 129/129 passing tests; combined platform
+and waveform tests total **410/410 with zero warnings**.
 ---
 
 ## Why this project exists
