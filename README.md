@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/licence-MIT-lightgrey" alt="licence"/>
 </p>
 
-ILMOP is a full-stack, production-grade Mission Operations System (MOS)
+ILMOP is a full-stack, production-grade LEO Digital Twin and  Mission Operations System (MOS)
 for Low Earth Orbit (LEO) satellite constellations, built from first
 principles in Python. It demonstrates the complete operational chain of
 modern commercial satellite operations: physics-accurate spacecraft
@@ -610,7 +610,7 @@ Full ADR documents: [`docs/adr/`](docs/adr/)
 ## Author
 
 **Stephen Ogodo**
-Data Scientist / ML Engineer — TerraNova Resilience Analytics Ltd / NEXYGENE
+Data Scientist / ML Engineer — AMDARI
 PhD Researcher — Signal Waveform for Satellite Communication, Navigation,
 and Remote Sensing (LEO-focused, OTFS-ISAC)
 
