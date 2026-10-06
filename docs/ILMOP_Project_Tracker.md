@@ -2,9 +2,9 @@
 
 **Project:** Intelligent LEO Monitoring and Operation Platform
 **GitHub:** github.com/stephenogodo/ILMOP-Intelligent-LEO-Monitoring-and-Operation-Platform
-**Current version:** v0.6.0-beta (Sprint 6 complete)
-**Last updated:** September 2026
-**Total tests passing:** 281/281 (1 skipped)
+**Current version:** v0.7.0-beta (Sprint 7 in progress)
+**Last updated:** October 2026
+**Total tests passing:** 515/515 (1 skipped)
 
 ---
 
@@ -18,7 +18,7 @@
 | 4 | v0.4.0-beta | Telemetry Data Platform (FastAPI, Streamlit, Redis) | ✅ Complete | 75/75 |
 | 5 | v0.5.0-beta | Intelligent Digital Twin (AI/ML anomaly detection) | ✅ Complete | 152/152 |
 | 6 | v0.6.0-beta | Demonstration Layer (OTFS waveform, navigation, fleet dashboard) | ✅ Complete | 281/281 |
-| 7 | v1.0.0 | Cloud-Native Platform (Azure AKS, ILP scheduler) | ⬅ Next | — |
+| 7 | v1.0.0 | LEO Constellation Operations Suite | 🔄 In Progress | 234/234 (so far) |
 
 ---
 
@@ -133,24 +133,64 @@
 
 ---
 
-## Sprint 7 — Scope
+## Sprint 7 — LEO Constellation Operations Suite (In Progress)
 
-**Version:** v1.0.0
-**Title:** Cloud-Native Platform
+**Version:** v1.0.0  
+**Architecture:** Seven-layer build sequence
+
+| Layer | Title | File | Tests | Status |
+|-------|-------|------|-------|--------|
+| 1 | Contact Window Geometry | `services/scheduler/geometry.py` + `contact_window.py` | 13/13 | ✅ Complete |
+| 2 | ILP Ground Station Scheduler | `services/scheduler/ilp_scheduler.py` | 16/16 | ✅ Complete |
+| 3 | ISL Topology Manager | `services/scheduler/isl_topology.py` | 18/18 | ✅ Complete |
+| 4 | Ground Station Handover | `services/scheduler/handover.py` | 34/34 | ✅ Complete |
+| 5 | Dark Satellite Detection | `services/scheduler/dark_satellite.py` | 24/24 | ✅ Complete |
+| 6 | Relay Coordinator | `services/scheduler/relay_coordinator.py` | — | 🔄 Pending |
+| 7 | Composite ILP Objective + Dashboard | `services/scheduler/scheduler.py` + dashboard integration | — | 🔄 Pending |
+
+**Layer details:**
+
+**Layer 1 — Contact Window Geometry** (13 tests)
+- `geometry.py`: `GroundStation` dataclass (name, lat_deg, lon_deg, alt_km); `elevation_angle()` and `compute_contact_windows()` using spherical geometry
+- `contact_window.py`: `ContactWindow` dataclass (satellite_id, station_name, aos_unix, los_unix, max_elevation_deg); `merge_overlapping_windows()`
+- Tests: `tests/test_geometry.py`, `tests/test_contact_window.py`
+
+**Layer 2 — ILP Ground Station Scheduler** (16 tests)
+- `ilp_scheduler.py`: PuLP 2.9.0 ILP formulation; binary decision variables x[sat][win]; maximises total contact duration; enforces single-station constraint; 5-second solver time limit with greedy fallback
+- Tests: `tests/test_ilp_scheduler.py`
+
+**Layer 3 — ISL Topology Manager** (18 tests)
+- `isl_topology.py`: `ISLLink` dataclass; `compute_isl_topology()` checks line of sight (LOS) between pairs — two satellites can communicate over an ISL only if there is LOS between them (i.e., the link path does not pass through the Earth); `build_adjacency_matrix()`; `find_relay_path()` using BFS shortest-hop routing
+- Tests: `tests/test_isl_topology.py`
+
+**Layer 4 — Ground Station Handover** (34 tests)
+- `handover.py`: `HandoverState` FSM (IDLE → ACQUIRING → ACTIVE → HANDING_OVER → RELEASED); `HandoverEvent` and `HandoverPlan` dataclasses; `build_handover_plan()` with configurable `overlap_margin_s` (default 30 s); `get_active_station()` point-in-time query; `build_constellation_handover_plans()`
+- Tests: `tests/test_handover.py`
+
+**Layer 5 — Dark Satellite Detection** (24 tests)
+- `dark_satellite.py`: `DarkInterval` dataclass (satellite_id, start_unix, end_unix, duration_s); `is_dark()` horizon-based check (default 600 s); `find_dark_satellites()` fleet scan; `compute_dark_intervals()` with window merge and gap detection
+- Tests: `tests/test_dark_satellite.py`
+
+**Sprint 7 test count progression:**
+
+| Batch | Layers | New tests | Cumulative |
+|-------|--------|-----------|------------|
+| Batch 1 | Layer 1 | 13 | 294 |
+| Batch 2 | Layer 2 | 16 | 310 |
+| Batch 3 | Layer 3 | 18 | 328 |
+| Batch 4 | Layer 4 | 34 | 362 |
+| Batch 5 | Layer 5 | 24 | 386 |
+
+**Pending Sprint 7 deliverables:**
 
 | # | Deliverable | File | Notes |
 |---|---|---|---|
-| 1 | Azure AKS Kubernetes manifests | `infrastructure/k8s/` | All 7 ILMOP services as Kubernetes deployments |
-| 2 | Azure Event Hubs (Kafka-compatible) | `infrastructure/k8s/` | Zero code change — Kafka wire protocol |
-| 3 | Azure Database for PostgreSQL (TimescaleDB) | `infrastructure/k8s/` | Flexible Server with TimescaleDB extension |
-| 4 | Azure Blob Storage + MLflow | `infrastructure/k8s/` | MLflow tracking server backend |
-| 5 | ILP ground station scheduler | `services/scheduler/ilp_scheduler.py` | Replaces contact timer; multi-station, multi-satellite |
-| 6 | ContactModel geometry-driven | `services/satellite_simulator/contact.py` | Elevation-angle-based window detection |
-| 7 | Molniya Scenario 4 demo | `run_demo.py` | Svalbard + Fairbanks ground stations |
-| 8 | Four-scenario progressive demo | `run_demo.py` | Scenario 1→2→3→4 end-to-end |
-| 9 | ADR-019 | `docs/adr/ADR-019-azure-cloud-platform.md` | Azure AKS rationale |
-| 10 | ADR-020 | `docs/adr/ADR-020-ilp-ground-station-scheduler.md` | ILP over contact timer |
-| 11 | ADD + tracker update | — | After Sprint 7 completion |
+| 6 | Relay Coordinator | `services/scheduler/relay_coordinator.py` | Uses ISL paths from Layer 3 to route data via relay satellites |
+| 7 | Composite ILP Objective | `services/scheduler/scheduler.py` | α=0.5×duration + β=0.3×relay_value + γ=0.2×data_age |
+| 8 | Dashboard Integration | `services/dashboard/` | Sprint 7 metrics in operator view |
+| 9 | Molniya Scenario 4 | `run_demo.py` | 6 HEO satellites, Svalbard + Fairbanks, 8-hour apogee dwell |
+| 10 | Azure AKS manifests | `infrastructure/k8s/` | Moved to Sprint 8 |
+| 11 | ADR-019, ADR-020 | `docs/adr/` | Azure platform + ILP scheduler rationale |
 
 **Key architectural note (ILP vs contact timer):**
 ILP adds value only when there are scheduling choices to make — multiple satellites
@@ -158,11 +198,6 @@ competing for multiple ground stations simultaneously. For Scenarios 1–2, the 
 timer is correct (one satellite, trivial scheduling). ILP earns its complexity in
 Sprint 7 with Scenario 3 (24 sats) and Scenario 4 (Molniya dual-station: Svalbard +
 Fairbanks). See ADR-020.
-
-**Ground station parametrisation (Sprint 6 action, Sprint 7 dependency):**
-The navigation validation pipeline passes ground station position as a parameter.
-The ILP scheduler can pass the selected station coordinate without touching navigation
-code. This decoupling was built in Sprint 6. ✅
 
 ---
 
@@ -175,7 +210,7 @@ code. This decoupling was built in Sprint 6. ✅
 | R3 | ~~Kafka producer has no key — multi-satellite ordering breaks~~ | ~~High~~ | ~~Medium~~ | ✅ Closed | Fixed in Sprint 3 |
 | R4 | ~~Isolation Forest contamination=0.05 causes false alarms~~ | ~~High~~ | ~~High~~ | ✅ Closed | contamination=0.01 Sprint 5 |
 | R5 | ~~Anomaly detection trained on nominal data only~~ | ~~High~~ | ~~High~~ | ✅ Closed | Fault injection + two-layer detector Sprint 5 |
-| R6 | Azure cost overrun in Sprint 7 | Low | Medium | Open | Size AKS for dev/test; stop compute when not in use |
+| R6 | Azure cost overrun | Low | Medium | Open | Azure AKS deferred to Sprint 8; size for dev/test |
 | R7 | ~~`shared/config.py` absent; Docker networking failures~~ | ~~High~~ | ~~Medium~~ | ✅ Closed | Created Sprint 3 |
 | R8 | poliastro API version incompatibility | Medium | High | ✅ Closed | 0.7.0 API fixed Sprint 6; cowell() + ad= pattern documented |
 | R9 | SGP4 truth accuracy insufficient for navigation papers | High | High | ✅ Closed | HPOP J2–J6 truth model built Sprint 6 (ADR-017) |
@@ -245,6 +280,9 @@ streamlit run services/dashboard/pages/coverage_statistics.py
 # Full test suite
 python -m pytest tests/ -v
 
+# Sprint 7 — scheduler layer tests
+python -m pytest tests/test_geometry.py tests/test_contact_window.py tests/test_ilp_scheduler.py tests/test_isl_topology.py tests/test_handover.py tests/test_dark_satellite.py -v
+
 # Retrain model
 python -m services.anomaly_detection.train --orbit-type LEO_CIRCULAR
 ```
@@ -257,8 +295,8 @@ python -m services.anomaly_detection.train --orbit-type LEO_CIRCULAR
 |---|---|---|---|
 | Supervisor Briefing | v4.0 | Sep 2026 | ILMOP_Supervisor_Briefing_v4.docx |
 | Training Manual | v1.9 | Sep 2026 | ILMOP_Training_Manual_v1.9.docx |
+| Build Journal | Sprint 7 | Oct 2026 | ILMOP_Sprint7_Build_Journal.docx |
 | Concept of Operations | v1.5 | Sep 2026 | docs/ConOps/ |
 | Architecture Design Document | v0.6.0 | Sep 2026 | docs/ADD/ |
 | Navigation Validation Report | v2 (final) | Sep 2026 | Report2v2_Navigation_Three_Level_Final.docx |
 | Channel Emulator Validation Report | v1 | Sep 2026 | Report1_Channel_Emulator_Validation.docx |
-
