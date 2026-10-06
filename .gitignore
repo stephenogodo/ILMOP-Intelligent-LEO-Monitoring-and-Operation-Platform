@@ -64,15 +64,12 @@ logs/
 .coverage
 htmlcov/
 
-docs/word/
-
-docs/word/
-
-docs/word/
+# ── Data / simulation ─────────────────────────────────────────────────────────
 data/
-training_manual/
-
 data/sim_state/
+training_manual/
 score_test.py
 
+# ── Private / unpublished research documents ──────────────────────────────────
 docs/private/
+docs/word/

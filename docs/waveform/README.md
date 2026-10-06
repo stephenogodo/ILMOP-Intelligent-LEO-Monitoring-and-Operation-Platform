@@ -45,3 +45,4 @@ Write a WDR when:
 - A test failure reveals a design constraint (e.g. WDR-003, WDR-004, WDR-005)
 - A paper framing decision is made that affects what gets implemented (e.g. WDR-007, WDR-008)
 - Any decision that would take more than five minutes to reconstruct from the code alone
+| [WDR-010](WDR-010-guard-pos-derivation.md) | k_guard_pos formal derivation; freed-bin count corrected 720 → 1,470 | Accepted | Sep 2026 |
