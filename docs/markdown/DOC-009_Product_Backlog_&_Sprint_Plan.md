@@ -112,8 +112,8 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 ## Sprint 7 — LEO Constellation Operations Suite
 
 **Version:** v1.0.0  
-**Status:** 🔄 In Progress (Layers 1–5 complete)  
-**Tests to date:** 234 new (515 cumulative)
+**Status:** 🔄 In Progress (Layers 1–5 complete; S7-14 composite ILP objective delivered)  
+**Tests to date:** 254 new (535 cumulative)
 
 ### Completed stories
 
@@ -131,13 +131,13 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 | S7-10 | As an operator, I need `is_dark()` so that I can determine whether a satellite has no scheduled ground contact within a configurable horizon. | 5 | 5 | ✅ Done |
 | S7-11 | As an operator, I need `find_dark_satellites()` so that I can scan the whole fleet for dark satellites in one call. | 5 | 3 | ✅ Done |
 | S7-12 | As an operator, I need `compute_dark_intervals()` so that I can see exactly when and for how long each satellite loses ground contact. | 5 | 5 | ✅ Done |
+| S7-14 | As a scheduler, I need a composite ILP objective (α×duration + β×relay_value + γ×data_age) so that scheduling decisions balance contact time, relay utility, and data freshness. | 2 | 13 | ✅ Done |
 
 ### Pending stories
 
 | ID | User story | Layer | SP | Status |
 |----|-----------|-------|----|--------|
 | S7-13 | As an operator, I need a relay coordinator so that satellites with no direct ground contact can route data through relay satellites using the ISL topology. | 6 | 13 | 🔄 Pending |
-| S7-14 | As a scheduler, I need a composite ILP objective (α×duration + β×relay_value + γ×data_age) so that scheduling decisions balance contact time, relay utility, and data freshness. | 7 | 13 | 🔄 Pending |
 | S7-15 | As an operator, I need Sprint 7 metrics integrated into the operator dashboard so that handover state, dark satellite alerts, and relay paths are visible in real time. | 7 | 8 | 🔄 Pending |
 | S7-16 | As a demonstrator, I need a Molniya Scenario 4 (6 HEO satellites, Svalbard + Fairbanks, 8-hour apogee dwell) so that the scheduler is validated against a high-latitude dual-station case. | 7 | 8 | 🔄 Pending |
 
@@ -165,5 +165,5 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 | Sprint 4 | 19 | 80 |
 | Sprint 5 | 32 | 112 |
 | Sprint 6 | 49 | 161 |
-| Sprint 7 (to date) | 62 | 223 |
-| Sprint 7 (remaining) | 42 | — |
+| Sprint 7 (to date) | 75 | 236 |
+| Sprint 7 (remaining) | 29 | — |
