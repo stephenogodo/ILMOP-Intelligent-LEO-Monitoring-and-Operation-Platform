@@ -1,12 +1,12 @@
 """
 services/dashboard/pages/fleet_dashboard.py
 
-ILMOP Fleet Dashboard — Sprint 6, Deliverable 5
+ILMOP Fleet Dashboard — Sprint 7, Deliverable 6
 =================================================
 
 Displays all constellation satellites simultaneously on a world map,
 with real-time orbital positions, visibility counts, GDOP statistics,
-and contact window scheduling.
+contact window scheduling, and a fading ground-track trail.
 
 Four constellation scenarios are selectable:
 
@@ -19,6 +19,12 @@ The dashboard operates in two modes:
     Live mode   — reads telemetry from TimescaleDB via the ILMOP REST API
     Orbital mode — uses SGP4 orbital mechanics only (no services required)
 
+Sprint 7 addition: ground-track trail
+    Each satellite leaves a fading colour trail of recent positions behind
+    it on the world map.  Trail history is maintained in st.session_state
+    across auto-refresh cycles.  Trail length and visibility are
+    configurable from the sidebar.
+
 Run from the ILMOP project root:
     streamlit run services/dashboard/pages/fleet_dashboard.py
 
@@ -27,6 +33,7 @@ Dependencies: streamlit, plotly, sgp4, scipy, numpy
 
 import math
 import time
+from collections import deque
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
@@ -101,6 +108,10 @@ GROUND_TRACK_STEPS  = 90     # points per satellite ground track (1 orbit)
 PASS_FORECAST_MIN   = 180    # minutes ahead to forecast passes
 PASS_STEP_S         = 30     # step size for pass forecast
 
+# Trail constants
+TRAIL_MAX_POINTS    = 180    # hard cap on trail history per satellite
+                             # (at 10 s refresh = 30 min max retention)
+
 
 # ── orbit builder ─────────────────────────────────────────────────────────────
 
@@ -174,10 +185,7 @@ def get_ground_tracks(
 ) -> Dict[str, List[Tuple[float, float]]]:
     """Get one full orbital period of ground track for each satellite."""
     tracks = {}
-    # Approximate orbital period based on altitude
     for sid, exp in exporters:
-        # Use the stored semi-major axis _a_m (metres) directly
-        # OrbitalProfileExporter does not expose altitude_km publicly
         period_s = 2 * math.pi * math.sqrt(
             exp._a_m ** 3 / 3.986_004_418e14
         )
@@ -197,33 +205,22 @@ def get_ground_tracks(
 
 def _ecef_to_latlon(frame: OrbitalFrame) -> Tuple[float, float]:
     """Convert SGP4 ECI frame (via slant range geometry) to approx lat/lon.
-    
+
     Since OrbitalFrame stores elevation and azimuth from the ground station
     but not directly the satellite's geographic coordinates, we derive the
     subsatellite point from the range, elevation, and azimuth.
     This is an approximation suitable for map display.
     """
-    # Use the exporter's internal SGP4 to get ECEF position
-    # We reconstruct from range + elevation + azimuth at the ground station
-    # For display purposes we use the Doppler/range to estimate subsatellite lat/lon
-    # A simpler approach: use Earth central angle from elevation formula
-    Re = 6_371.0        # km
-    h  = frame.range_m / 1000.0 * math.sin(math.radians(frame.elevation_deg))
-    # h is approximate altitude component — use range directly
-    # This method gives a reasonable subsatellite approximation for display
-    rho = frame.range_m / 1000.0   # slant range km
+    Re = 6_371.0
+    rho = frame.range_m / 1000.0
     el  = math.radians(frame.elevation_deg)
     az  = math.radians(frame.azimuth_deg)
 
-    # Earth central angle
     sin_rho = rho * math.cos(el) / Re
     sin_rho = max(-1.0, min(1.0, sin_rho))
     earth_angle = math.asin(sin_rho)
 
-    # Ground station lat/lon — we use a placeholder since OrbitalFrame
-    # doesn't store this. The subsatellite lat is approximated from azimuth.
-    # For display we use a simplified projection.
-    gs_lat = math.radians(52.205)   # will be overridden per station below
+    gs_lat = math.radians(52.205)
     gs_lon = math.radians(0.119)
 
     sat_lat = math.asin(
@@ -273,20 +270,137 @@ def compute_gdop(positions: List[dict]) -> float:
     in_view = [p for p in positions if p['in_view']]
     if len(in_view) < 4:
         return float('inf')
-    # Simplified single-pass GDOP from elevation angles only (no positions)
-    # For full 3D GDOP we need ECEF satellite positions — use elevation proxy
     best_el = max(p['elevation_deg'] for p in in_view)
     return round(1.0 / math.sin(math.radians(max(best_el, 5.0))), 2)
+
+
+# ── trail helpers ─────────────────────────────────────────────────────────────
+
+def _update_trail(
+    trail_history: Dict[str, deque],
+    positions:     List[dict],
+    sim_now:       datetime,
+    max_points:    int,
+    trail_min:     int,
+) -> None:
+    """Append the current satellite positions to the per-satellite trail deque.
+
+    Points older than trail_min minutes are pruned from the front.
+
+    Args:
+        trail_history:  session_state dict of {sat_id: deque of (lat, lon, sim_time)}
+        positions:      current positions list from get_current_positions()
+        sim_now:        current simulation datetime (used for age comparison)
+        max_points:     absolute maximum points per satellite (hard cap)
+        trail_min:      soft age limit in minutes; older points are dropped
+    """
+    cutoff = sim_now - timedelta(minutes=trail_min)
+    for p in positions:
+        sid = p['id']
+        if sid not in trail_history:
+            trail_history[sid] = deque(maxlen=max_points)
+        trail_history[sid].append((p['lat'], p['lon'], sim_now))
+        # Prune points older than the configured trail window
+        while trail_history[sid] and trail_history[sid][0][2] < cutoff:
+            trail_history[sid].popleft()
+
+
+def _hex_to_rgb(hex_color: str) -> Tuple[int, int, int]:
+    """Convert '#RRGGBB' to (R, G, B) integers."""
+    h = hex_color.lstrip('#')
+    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
+
+def add_trail_traces(
+    fig:           go.Figure,
+    trail_history: Dict[str, deque],
+    scenario_color: str,
+    trail_min:     int,
+    sim_now:       datetime,
+) -> None:
+    """Add one fading trail trace per satellite to the Plotly figure.
+
+    Each trail is drawn as a single Scattergeo line with an opacity gradient
+    achieved by rendering N short line segments, each with decreasing opacity
+    from oldest (nearly transparent) to newest (fully opaque).
+
+    The trail is split into TRAIL_SEGMENTS segments.  The newest segment has
+    opacity TRAIL_OPACITY_MAX and each older segment fades linearly to
+    TRAIL_OPACITY_MIN.  Antimeridian crossings (|Δlon| > 180°) are broken
+    with a None separator to prevent the line wrapping around the globe.
+
+    Args:
+        fig:            Plotly Figure to add traces to
+        trail_history:  {sat_id: deque of (lat, lon, sim_time)}
+        scenario_color: hex colour string for the current scenario
+        trail_min:      current trail length setting in minutes
+        sim_now:        current simulation time (for age-based fade)
+    """
+    TRAIL_SEGMENTS     = 8     # number of opacity bands
+    TRAIL_OPACITY_MAX  = 0.90  # newest segment
+    TRAIL_OPACITY_MIN  = 0.05  # oldest segment
+
+    r, g, b = _hex_to_rgb(scenario_color)
+
+    for sid, history in trail_history.items():
+        points = list(history)   # list of (lat, lon, sim_time)
+        if len(points) < 2:
+            continue
+
+        n = len(points)
+        # Divide the trail into TRAIL_SEGMENTS chunks
+        seg_size = max(1, n // TRAIL_SEGMENTS)
+
+        for seg_idx in range(TRAIL_SEGMENTS):
+            start = seg_idx * seg_size
+            end   = start + seg_size + 1   # +1 for connectivity
+            if seg_idx == TRAIL_SEGMENTS - 1:
+                end = n                    # last segment goes to the end
+            if start >= n - 1:
+                break
+
+            seg_points = points[start:end]
+            if len(seg_points) < 2:
+                continue
+
+            # Opacity: linearly interpolated from TRAIL_OPACITY_MIN (oldest)
+            # to TRAIL_OPACITY_MAX (newest)
+            frac    = (seg_idx + 1) / TRAIL_SEGMENTS   # 0→1, newest = 1
+            opacity = TRAIL_OPACITY_MIN + frac * (TRAIL_OPACITY_MAX - TRAIL_OPACITY_MIN)
+
+            # Build lat/lon lists, inserting None at antimeridian crossings
+            lats: List[Optional[float]] = []
+            lons: List[Optional[float]] = []
+            prev_lon = seg_points[0][1]
+            for lat, lon, _t in seg_points:
+                if lats and abs(lon - prev_lon) > 180.0:
+                    lats.append(None)
+                    lons.append(None)
+                lats.append(lat)
+                lons.append(lon)
+                prev_lon = lon
+
+            fig.add_trace(go.Scattergeo(
+                lat  = lats,
+                lon  = lons,
+                mode = 'lines',
+                line = dict(
+                    width = 2,
+                    color = f'rgba({r},{g},{b},{opacity:.3f})',
+                ),
+                showlegend = (seg_idx == TRAIL_SEGMENTS - 1 and
+                              sid == list(trail_history.keys())[0]),
+                name       = 'Trail' if (seg_idx == TRAIL_SEGMENTS - 1 and
+                                         sid == list(trail_history.keys())[0]) else None,
+                hoverinfo  = 'skip',
+            ))
 
 
 # ── sidebar controls ──────────────────────────────────────────────────────────
 
 with st.sidebar:
-    st.image('https://raw.githubusercontent.com/stephenogodo/ILMOP-Intelligent-LEO-Monitoring-and-Operation-Platform/main/docs/assets/logo.png',
-             use_container_width=True) if False else None
-
     st.markdown('## 🛰️ ILMOP Fleet Dashboard')
-    st.markdown('**Sprint 6 · Deliverable 5**')
+    st.markdown('**Sprint 7 · Deliverable 6**')
     st.divider()
 
     scenario_name = st.selectbox(
@@ -310,6 +424,17 @@ with st.sidebar:
     st.divider()
 
     show_tracks = st.toggle('Show ground tracks', value=True)
+    show_trail  = st.toggle('Show position trail', value=True,
+                            help='Fading trail of recent satellite positions')
+
+    trail_min = 10
+    if show_trail:
+        trail_min = st.slider(
+            'Trail length (minutes)',
+            min_value=1, max_value=15, value=10, step=1,
+            help='How many minutes of history to show behind each satellite',
+        )
+
     show_passes = st.toggle('Show pass schedule', value=True)
 
     refresh_s = st.slider(
@@ -320,6 +445,11 @@ with st.sidebar:
     if st.button('🔄 Refresh now'):
         st.rerun()
 
+    if st.button('🗑️ Clear trail history'):
+        if 'trail_history' in st.session_state:
+            del st.session_state['trail_history']
+        st.rerun()
+
     st.caption(f'Ground station: {gs_name}')
     st.caption(f'Lat {gs["lat"]:.3f}° | Lon {gs["lon"]:.3f}°')
 
@@ -327,9 +457,7 @@ with st.sidebar:
 # ── main layout ───────────────────────────────────────────────────────────────
 
 now_utc = datetime.now(tz=timezone.utc)
-# Use fixed epoch for orbital mechanics (reproducible with SGP4 initial state)
 MODEL_EPOCH = datetime(2026, 9, 22, 10, 0, 0, tzinfo=timezone.utc)
-# Offset into the simulation: use wall-clock seconds from session start
 if 'sim_start' not in st.session_state:
     st.session_state.sim_start = time.time()
 sim_elapsed = time.time() - st.session_state.sim_start
@@ -343,7 +471,7 @@ Simulation time: <b>{sim_now.strftime('%H:%M:%S')} UTC</b>
 </p>
 """, unsafe_allow_html=True)
 
-# Build exporters
+# Build exporters and compute positions
 with st.spinner('Computing orbital positions…'):
     exporters = build_exporters(
         scenario_cfg, MODEL_EPOCH,
@@ -358,6 +486,26 @@ with st.spinner('Computing orbital positions…'):
         passes = forecast_passes(exporters, sim_now)
     else:
         passes = []
+
+# ── trail state update ────────────────────────────────────────────────────────
+# Initialise trail history in session_state on first run.
+# The trail_scenario key detects when the user switches scenario, so we
+# can reset history and avoid mixing trails from different constellations.
+
+if 'trail_history' not in st.session_state:
+    st.session_state.trail_history = {}
+if st.session_state.get('trail_scenario') != scenario_name:
+    st.session_state.trail_history  = {}
+    st.session_state.trail_scenario = scenario_name
+
+if show_trail:
+    _update_trail(
+        st.session_state.trail_history,
+        positions,
+        sim_now,
+        max_points = TRAIL_MAX_POINTS,
+        trail_min  = trail_min,
+    )
 
 
 # ── metric row ────────────────────────────────────────────────────────────────
@@ -387,7 +535,7 @@ st.divider()
 
 fig = go.Figure()
 
-# Ground tracks
+# 1. Ground tracks (full orbital period, dotted, low opacity)
 if tracks:
     for sid, track in tracks.items():
         if not track:
@@ -403,7 +551,17 @@ if tracks:
             hoverinfo = 'skip',
         ))
 
-# Current satellite positions
+# 2. Ground-track trail (recent position history, fading colour)
+if show_trail and st.session_state.trail_history:
+    add_trail_traces(
+        fig,
+        st.session_state.trail_history,
+        scenario_cfg['color'],
+        trail_min,
+        sim_now,
+    )
+
+# 3. Current satellite positions — below-horizon (dim)
 vis_lats  = [p['lat'] for p in positions if     p['in_view']]
 vis_lons  = [p['lon'] for p in positions if     p['in_view']]
 vis_ids   = [p['id']  for p in positions if     p['in_view']]
@@ -417,7 +575,6 @@ novis_lons = [p['lon'] for p in positions if not p['in_view']]
 novis_ids  = [p['id']  for p in positions if not p['in_view']]
 novis_text = [f"{p['id']}<br>Below horizon" for p in positions if not p['in_view']]
 
-# Below-horizon satellites (dim)
 if novis_lats:
     fig.add_trace(go.Scattergeo(
         lat  = novis_lats, lon = novis_lons,
@@ -429,7 +586,7 @@ if novis_lats:
         name      = 'Below horizon',
     ))
 
-# In-view satellites (bright)
+# 4. Current satellite positions — in-view (bright)
 if vis_lats:
     fig.add_trace(go.Scattergeo(
         lat  = vis_lats, lon = vis_lons,
@@ -444,7 +601,7 @@ if vis_lats:
         name          = 'In view',
     ))
 
-# Ground station marker
+# 5. Ground station marker
 fig.add_trace(go.Scattergeo(
     lat  = [gs['lat']], lon = [gs['lon']],
     mode = 'markers+text',
@@ -478,6 +635,27 @@ fig.update_layout(
 )
 
 st.plotly_chart(fig, use_container_width=True)
+
+
+# ── trail info bar ────────────────────────────────────────────────────────────
+
+if show_trail:
+    n_trail_pts = sum(len(v) for v in st.session_state.trail_history.values())
+    oldest = None
+    for hist in st.session_state.trail_history.values():
+        if hist:
+            t = hist[0][2]
+            if oldest is None or t < oldest:
+                oldest = t
+    age_str = ''
+    if oldest:
+        age_s = (sim_now - oldest).total_seconds()
+        age_str = f' · oldest point {age_s/60:.1f} min ago'
+    st.caption(
+        f'🛤️  Trail: {trail_min} min window · '
+        f'{n_trail_pts} stored points across {len(st.session_state.trail_history)} satellites'
+        f'{age_str}'
+    )
 
 
 # ── lower panels ──────────────────────────────────────────────────────────────

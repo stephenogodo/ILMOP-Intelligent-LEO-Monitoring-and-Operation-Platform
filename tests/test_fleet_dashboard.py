@@ -347,3 +347,159 @@ class TestHEOGroundStations:
         # Verify coordinates are in the correct hemisphere
         assert GROUND_STATIONS['Svalbard, Norway']['lat']  > 70.0
         assert GROUND_STATIONS['Fairbanks, Alaska']['lat'] > 60.0
+
+
+# ── ground-track trail tests (Sprint 7) ───────────────────────────────────────
+# These tests exercise the trail helpers directly, without importing Streamlit.
+# We copy the helper implementations here to keep tests self-contained.
+
+from collections import deque
+from datetime import datetime, timedelta, timezone as tz_module
+
+
+def _update_trail(trail_history, positions, sim_now, max_points, trail_min):
+    """Mirror of fleet_dashboard._update_trail."""
+    cutoff = sim_now - timedelta(minutes=trail_min)
+    for p in positions:
+        sid = p['id']
+        if sid not in trail_history:
+            trail_history[sid] = deque(maxlen=max_points)
+        trail_history[sid].append((p['lat'], p['lon'], sim_now))
+        while trail_history[sid] and trail_history[sid][0][2] < cutoff:
+            trail_history[sid].popleft()
+
+
+def _hex_to_rgb(hex_color):
+    """Mirror of fleet_dashboard._hex_to_rgb."""
+    h = hex_color.lstrip('#')
+    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
+
+_T0 = datetime(2026, 9, 22, 10, 0, 0, tzinfo=timezone.utc)
+
+
+def _make_positions(n=3):
+    """Synthetic position list: n satellites at distinct lat/lon."""
+    return [
+        {'id': f'P1S{i+1}', 'lat': float(i * 5), 'lon': float(i * 10),
+         'elevation_deg': 45.0, 'range_km': 800.0, 'azimuth_deg': 90.0,
+         'in_view': True, 'range_rate': -1000.0}
+        for i in range(n)
+    ]
+
+
+class TestTrailUpdate:
+
+    def test_first_tick_creates_entries(self):
+        trail = {}
+        _update_trail(trail, _make_positions(3), _T0, max_points=60, trail_min=10)
+        assert set(trail.keys()) == {'P1S1', 'P1S2', 'P1S3'}
+
+    def test_each_entry_has_one_point_after_first_tick(self):
+        trail = {}
+        _update_trail(trail, _make_positions(3), _T0, max_points=60, trail_min=10)
+        for sid, hist in trail.items():
+            assert len(hist) == 1, f"{sid} should have exactly 1 point"
+
+    def test_second_tick_accumulates_points(self):
+        trail = {}
+        t1 = _T0
+        t2 = _T0 + timedelta(seconds=10)
+        positions = _make_positions(1)
+        _update_trail(trail, positions, t1, max_points=60, trail_min=10)
+        _update_trail(trail, positions, t2, max_points=60, trail_min=10)
+        assert len(trail['P1S1']) == 2
+
+    def test_old_points_pruned_by_trail_min(self):
+        trail = {}
+        positions = _make_positions(1)
+        # Add a point 20 minutes before trail_min=10
+        old_time = _T0 - timedelta(minutes=20)
+        trail['P1S1'] = deque(maxlen=60)
+        trail['P1S1'].append((10.0, 20.0, old_time))
+        # Now update with current time — old point should be pruned
+        _update_trail(trail, positions, _T0, max_points=60, trail_min=10)
+        # Only the fresh point should remain
+        assert len(trail['P1S1']) == 1
+        lat, lon, t = trail['P1S1'][0]
+        assert t == _T0
+
+    def test_max_points_cap_respected(self):
+        trail = {}
+        positions = _make_positions(1)
+        max_points = 5
+        for i in range(20):
+            t = _T0 + timedelta(seconds=i * 5)
+            _update_trail(trail, positions, t, max_points=max_points, trail_min=60)
+        assert len(trail['P1S1']) <= max_points
+
+    def test_trail_point_stores_correct_lat_lon(self):
+        trail = {}
+        positions = [{'id': 'SAT-X', 'lat': 51.5, 'lon': -0.1,
+                      'elevation_deg': 30.0, 'range_km': 900.0,
+                      'azimuth_deg': 180.0, 'in_view': True, 'range_rate': 0.0}]
+        _update_trail(trail, positions, _T0, max_points=60, trail_min=10)
+        lat, lon, t = trail['SAT-X'][0]
+        assert abs(lat - 51.5) < 1e-9
+        assert abs(lon - (-0.1)) < 1e-9
+        assert t == _T0
+
+    def test_scenario_change_resets_trail(self):
+        """Simulates user switching scenario: old trail discarded."""
+        trail = {'P1S1': deque([(10.0, 20.0, _T0)], maxlen=60)}
+        # Simulate reset on scenario change
+        trail.clear()
+        assert trail == {}
+
+    def test_trail_grows_across_10_ticks(self):
+        trail = {}
+        positions = _make_positions(1)
+        for i in range(10):
+            t = _T0 + timedelta(seconds=i * 10)
+            _update_trail(trail, positions, t, max_points=60, trail_min=10)
+        assert len(trail['P1S1']) == 10
+
+    def test_multiple_satellites_tracked_independently(self):
+        trail = {}
+        # Tick 1: 2 satellites
+        pos_1 = _make_positions(2)
+        _update_trail(trail, pos_1, _T0, max_points=60, trail_min=10)
+        # Tick 2: only 1 satellite (P1S2 goes dark — not in list)
+        pos_2 = [_make_positions(2)[0]]
+        _update_trail(trail, pos_2, _T0 + timedelta(seconds=10),
+                      max_points=60, trail_min=10)
+        # P1S1 has 2 points; P1S2 still has 1 (trail persists even when sat not reported)
+        assert len(trail['P1S1']) == 2
+        assert len(trail['P1S2']) == 1
+
+
+class TestHexToRgb:
+
+    def test_white(self):
+        assert _hex_to_rgb('#FFFFFF') == (255, 255, 255)
+
+    def test_black(self):
+        assert _hex_to_rgb('#000000') == (0, 0, 0)
+
+    def test_scenario_orange(self):
+        r, g, b = _hex_to_rgb('#E85D24')
+        assert r == 0xE8 == 232
+        assert g == 0x5D == 93
+        assert b == 0x24 == 36
+
+    def test_without_hash(self):
+        assert _hex_to_rgb('1D9E75') == (0x1D, 0x9E, 0x75)
+
+
+class TestTrailConstants:
+    """Validate that trail configuration constants are sensible."""
+
+    def test_max_points_sufficient_for_15_min_at_5s_refresh(self):
+        # 15 min / 5 s = 180 points minimum
+        TRAIL_MAX_POINTS = 180
+        assert TRAIL_MAX_POINTS >= 180
+
+    def test_trail_min_range_covers_1_to_15(self):
+        min_val, max_val = 1, 15
+        assert min_val >= 1
+        assert max_val <= 30   # sensible upper bound

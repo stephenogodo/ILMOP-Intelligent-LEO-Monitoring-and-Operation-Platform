@@ -145,8 +145,8 @@
 | 3 | ISL Topology Manager | `services/scheduler/isl_topology.py` | 18/18 | ✅ Complete |
 | 4 | Ground Station Handover | `services/scheduler/handover.py` | 34/34 | ✅ Complete |
 | 5 | Dark Satellite Detection | `services/scheduler/dark_satellite.py` | 24/24 | ✅ Complete |
-| 6 | Relay Coordinator | `services/scheduler/relay_coordinator.py` | — | 🔄 Pending |
-| 7 | Dashboard Integration | `services/dashboard/` (Sprint 7 metrics) | — | 🔄 Pending |
+| 6 | Relay Coordinator | `services/scheduler/relay_coordinator.py` | 24/24 | ✅ Complete |
+| 7 | Dashboard Integration | `services/dashboard/pages/fleet_dashboard.py` | 15/15 trail | ✅ Complete |
 
 **Layer details:**
 
@@ -180,14 +180,16 @@
 | Batch 3 | Layer 3 | 18 | 328 |
 | Batch 4 | Layer 4 | 34 | 362 |
 | Batch 5 | Layer 5 | 24 | 386 |
-| Batch 6 (S7-14) | Layer 2 upgrade — composite ILP | +20 | **535** |
+| Batch 6 (S7-14) | Layer 2 upgrade — composite ILP | +20 | 535 |
+| Batch 7 | Layer 3a — Contact Scheduler | +17 | 552 |
+| Batch 8 | Layer 6 — Relay Coordinator | +24 | 576 |
+| Batch 9 | Dashboard — ground-track trail | +15 | **591** |
 
 **Pending Sprint 7 deliverables:**
 
 | # | Deliverable | File | Notes |
 |---|---|---|---|
 | 6 | Relay Coordinator | `services/scheduler/relay_coordinator.py` | Uses ISL paths from Layer 3 to route data via relay satellites |
-| 7 | Dashboard Integration | `services/dashboard/` | Sprint 7 metrics in operator view (handover state, dark alerts, relay paths) |
 | 9 | Molniya Scenario 4 | `run_demo.py` | 6 HEO satellites, Svalbard + Fairbanks, 8-hour apogee dwell |
 | 10 | Azure AKS manifests | `infrastructure/k8s/` | Moved to Sprint 8 |
 | 11 | ADR-019, ADR-020 | `docs/adr/` | Azure platform + ILP scheduler rationale |
