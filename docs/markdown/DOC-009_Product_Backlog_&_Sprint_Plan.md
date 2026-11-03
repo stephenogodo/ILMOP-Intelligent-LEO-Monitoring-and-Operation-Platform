@@ -1,8 +1,8 @@
 # Product Backlog & Sprint Plan
 
 **Document ID:** DOC-009  
-**Version:** 1.1  
-**Last updated:** October 2026  
+**Version:** 1.2  
+**Last updated:** November 2026  
 **Status:** Sprint 7 in progress
 
 ---
@@ -111,9 +111,9 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 
 ## Sprint 7 — LEO Constellation Operations Suite
 
-**Version:** v1.0.0  
-**Status:** 🔄 In Progress (Layers 1–5 complete; S7-14 composite ILP objective delivered)  
-**Tests to date:** 254 new (535 cumulative)
+**Version:** v0.7.0-beta  
+**Status:** 🔄 In Progress (Layers 1–6 complete; contact scheduler and ground-track trail delivered; Molniya Scenario 4 remaining)  
+**Tests to date:** 310 new (591 cumulative)
 
 ### Completed stories
 
@@ -132,26 +132,61 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 | S7-11 | As an operator, I need `find_dark_satellites()` so that I can scan the whole fleet for dark satellites in one call. | 5 | 3 | ✅ Done |
 | S7-12 | As an operator, I need `compute_dark_intervals()` so that I can see exactly when and for how long each satellite loses ground contact. | 5 | 5 | ✅ Done |
 | S7-14 | As a scheduler, I need a composite ILP objective (α×duration + β×relay_value + γ×data_age) so that scheduling decisions balance contact time, relay utility, and data freshness. | 2 | 13 | ✅ Done |
+| S7-13 | As an operator, I need a relay coordinator so that satellites with no direct ground contact can route data through relay satellites using the ISL topology. | 6 | 13 | ✅ Done (24 tests) |
+| S7-17 | As an operator, I need a contact scheduler runtime engine so that the static ILP schedule is turned into live AOS/LOS Kafka events (`contact.<sat_id>.aos/los/schedule`) with handover state and dark-satellite flags. | 3 | 8 | ✅ Done (17 tests) |
 
 ### Pending stories
 
 | ID | User story | Layer | SP | Status |
 |----|-----------|-------|----|--------|
-| S7-13 | As an operator, I need a relay coordinator so that satellites with no direct ground contact can route data through relay satellites using the ISL topology. | 6 | 13 | 🔄 Pending |
-| S7-15 | As an operator, I need Sprint 7 metrics integrated into the operator dashboard so that handover state, dark satellite alerts, and relay paths are visible in real time. | 7 | 8 | 🔄 Pending |
-| S7-16 | As a demonstrator, I need a Molniya Scenario 4 (6 HEO satellites, Svalbard + Fairbanks, 8-hour apogee dwell) so that the scheduler is validated against a high-latitude dual-station case. | 7 | 8 | 🔄 Pending |
+| S7-15 | As an operator, I need Sprint 7 metrics integrated into the operator dashboard so that handover state, dark satellite alerts, and relay paths are visible in real time. | 7 | 8 | 🔄 In progress — ground-track trail delivered (15 tests); handover, dark and relay panels remaining |
+| S7-16 | As a demonstrator, I need a Molniya Scenario 4 (3 HEO satellites in 3 planes, RAAN 0°/120°/240°, 63.4°, ~12 h, phased by mean anomaly so apogee passes are 8 hours apart; Svalbard + Fairbanks) so that continuous high-latitude coverage and the scheduler are validated against a dual-station case. Standalone HEO scenario with its own ML model, never mixed with LEO data (ADR-016). | 7 | 8 | 🔄 Pending |
+| S7-18 | As a researcher, I need a Scenario 5 hybrid constellation (18 satellites: 6 Molniya HEO in 6 planes × 1 sat, RAAN 0°/60°/…/300°, phased so apogee passes over a given region are 4 hours apart — the Scenario 4 set of 3 plus 3 redundant satellites at RAAN 60°/180°/300°; plus 12 circular LEO as 2 planes × 6 sats, 550 km, 53°; 7 ground stations incl. Svalbard and Fairbanks; ISL between any satellite pair with line of sight (LOS) within a maximum range, including cross-plane and HEO–LEO links) so that the composite ILP and relay feedback are validated, with overlapping HEO relay hubs for dark LEO satellites and continuous coverage preserved if any single HEO satellite fails (paper P-S7-2). Scheduling and relay experiments only; no anomaly-detection training. | 7 | 8 | 🔄 Pending — estimate |
 
 ---
 
-## Backlog — Sprint 8 (planned)
+## Sprint 8 — MOS Completeness (planned)
+
+**Version:** v0.8.0-beta  
+**Status:** ⏳ Planned  
+**Rationale:** Closes the gaps identified against the LEO MOS Architecture Study Guide so that the system deployed in Sprint 9 is complete, not one with known gaps.
 
 | ID | User story | Priority | SP | Notes |
 |----|-----------|----------|----|-------|
-| S8-01 | As an operator, I need Azure AKS Kubernetes manifests so that all ILMOP services can run in a cloud-native cluster. | Should | 13 | Deferred from Sprint 7 |
-| S8-02 | As an operator, I need Azure Event Hubs (Kafka-compatible) so that streaming works without an on-premises Kafka cluster. | Should | 8 | Zero code change — Kafka wire protocol |
-| S8-03 | As a data engineer, I need Azure Database for PostgreSQL with TimescaleDB extension so that historical telemetry persists in the cloud. | Should | 8 | Flexible Server |
-| S8-04 | As a researcher, I need Azure Blob Storage as an MLflow backend so that experiment artefacts are cloud-persisted. | Should | 5 | |
-| S8-05 | As a researcher, I need ADR-019 and ADR-020 published so that the Azure platform and ILP scheduler decisions are formally recorded. | Must | 3 | |
+| S8-01 | As a developer, I need telemetry schemas expressed as Avro or Protobuf IDL and served by a schema registry so that producers and consumers share one serialisation contract. | Must | 8 | Pydantic models remain the Python-native interface |
+| S8-02 | As a developer, I need schema versioning with backward/forward compatibility rules so that schema changes do not break existing consumers. | Must | 5 | |
+| S8-03 | As an operator, I need structured command authoring with parameter validation so that malformed commands are rejected before approval. | Must | 5 | Command path step 1 |
+| S8-04 | As an operator, I need a command approval gate (DRAFT→APPROVED→UPLINKED→CONFIRMED/FAILED) so that no command is uplinked without operator sign-off. | Must | 5 | Command path steps 2–4 |
+| S8-05 | As an operator, I need exactly-once command delivery (deduplication and idempotency keys) so that a command is never executed twice. | Must | 8 | |
+| S8-06 | As a tester, I need uplink simulation into the satellite simulator so that the full command loop can be verified end to end. | Should | 5 | |
+| S8-07 | As a ground segment engineer, I need a CCSDS frame ingestion and decommutation layer (`services/frame_processor/`) so that raw Space Packets / TM Transfer Frames are decoded into the existing telemetry schema. | Must | 13 | Bridges clean simulated telemetry and a realistic receive chain |
+| S8-08 | As a security owner, I need command authentication so that only authorised operators can author, approve, or uplink commands. | Must | 8 | Basic security scope |
+| S8-09 | As a researcher, I need an ADR for the command path design (ADR-021) so that exactly-once and approval decisions are formally recorded. | Must | 3 | |
+
+**Sprint 8 estimate:** 60 SP
+
+---
+
+## Sprint 9 — Cloud-Native and v1.0.0 (planned, was Sprint 8)
+
+**Version:** v1.0.0  
+**Status:** ⏳ Planned  
+**Rationale:** Cloud deployment is a wrapper around a feature-complete system, done once when features are stable.
+
+| ID | User story | Priority | SP | Notes |
+|----|-----------|----------|----|-------|
+| S9-01 | As an operator, I need Azure AKS Kubernetes manifests so that all ILMOP services can run in a cloud-native cluster. | Should | 13 | Deferred from Sprint 7 |
+| S9-02 | As an operator, I need Azure Event Hubs (Kafka-compatible) so that streaming works without an on-premises Kafka cluster. | Should | 8 | Zero code change — Kafka wire protocol |
+| S9-03 | As a data engineer, I need Azure Database for PostgreSQL Flexible Server with TimescaleDB extension so that historical telemetry persists in the cloud. | Should | 8 | |
+| S9-04 | As a security owner, I need Azure Key Vault so that secrets are held outside environment variables. | Should | 5 | |
+| S9-05 | As a researcher, I need MLflow artefacts migrated to Azure Blob Storage so that experiment artefacts are cloud-persisted. | Should | 5 | |
+| S9-06 | As a demonstrator, I need a five-scenario progressive cloud demo (Scenarios 1→5) so that the full system is shown running on Azure. | Should | 8 | |
+| S9-07 | As a researcher, I need ADR-019 (Azure platform) published so that the cloud platform decision is formally recorded. | Must | 3 | ADR-020 already published |
+| S9-08 | As a release owner, I need the v1.0.0 tag and release so that the completed platform is formally released. | Must | 3 | |
+
+**Sprint 9 estimate:** 53 SP
+
+**Sprint order rationale:** operational features first (job-search critical, time-sensitive), MOS completeness before cloud, cloud deployment last.
 
 ---
 
@@ -165,5 +200,7 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 | Sprint 4 | 19 | 80 |
 | Sprint 5 | 32 | 112 |
 | Sprint 6 | 49 | 161 |
-| Sprint 7 (to date) | 75 | 236 |
-| Sprint 7 (remaining) | 29 | — |
+| Sprint 7 (to date) | 96 | 257 |
+| Sprint 7 (remaining) | 24 | — |
+| Sprint 8 (estimate) | 60 | — |
+| Sprint 9 (estimate) | 53 | — |
