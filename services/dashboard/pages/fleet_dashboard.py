@@ -12,8 +12,8 @@ Four constellation scenarios are selectable:
 
     Scenario 1 — 1 satellite,  1 plane,   550 km, 51.6°
     Scenario 2 — 6 satellites, 1 plane,   550 km, 53.0°
-    Scenario 3 — 24 satellites, 4 planes, 550 km, 53.0°cl
-    Scenario 4 — 6 Molniya HEO satellites, 63.4°, e=0.74
+    Scenario 3 — 24 satellites, 4 planes, 550 km, 53.0°
+    Scenario 4 — 6 Molniya HEO (1 per plane, 63.4°, e=0.74) + 12 LEO (2 planes × 6, 550 km, 53°)
 
 The dashboard operates in two modes:
     Live mode   — reads telemetry from TimescaleDB via the ILMOP REST API
@@ -94,13 +94,19 @@ SCENARIOS = {
         'color': '#E85D24',
         'description': 'Simultaneous trilateration — 24 satellites 4 planes',
     },
-    'Scenario 4 — 6 Molniya HEO': {
-        'n_planes': 1, 'sats_per_plane': 6,
+    'Scenario 4 — 6 HEO + 12 LEO': {
+        'n_planes': 6, 'sats_per_plane': 1,
         'altitude_km': 20200.0, 'inclination_deg': 63.4,
-        'raan_base': 0.0,    'raan_step': 60.0,
+        'raan_base': 0.0,    'raan_step': 60.0, 'ma_plane_step': 60.0,
         'eccentricity': 0.74,  'arg_perigee': 270.0,
+        'extra_shells': [{
+            'n_planes': 2, 'sats_per_plane': 6,
+            'altitude_km': 550.0, 'inclination_deg': 53.0,
+            'raan_base': 0.0, 'raan_step': 90.0,
+            'eccentricity': 0.001, 'arg_perigee': 0.0,
+        }],
         'color': '#B034C5',
-        'description': 'Polar coverage — 6 Molniya HEO satellites (standalone)',
+        'description': 'Hybrid — 6 Molniya HEO (1 per plane) + 12 LEO (2 planes × 6): HEO anomaly training and the contact-scheduling / relay research scenario',
     },
 }
 
@@ -115,6 +121,28 @@ TRAIL_MAX_POINTS    = 180    # hard cap on trail history per satellite
 
 # ── orbit builder ─────────────────────────────────────────────────────────────
 
+def satellite_slots(scenario_cfg: dict) -> list:
+    """
+    One (satellite_id, raan_deg, mean_anomaly_deg, shell) tuple per satellite.
+
+    A scenario describes its main orbit shell with the top-level keys; a hybrid
+    scenario (Scenario 4: HEO + LEO) lists further shells in 'extra_shells'.
+    Satellite IDs of the main shell are P<plane>S<slot>; those of extra shell k
+    are prefixed X<k>.
+    """
+    slots = []
+    shells = [scenario_cfg] + list(scenario_cfg.get('extra_shells', []))
+    for k, shell in enumerate(shells):
+        prefix = '' if k == 0 else f'X{k}'
+        for p in range(shell['n_planes']):
+            raan = shell['raan_base'] + p * shell['raan_step']
+            for s in range(shell['sats_per_plane']):
+                ma = (p * shell.get('ma_plane_step', 0.0)
+                      + s * (360.0 / shell['sats_per_plane'])) % 360.0
+                slots.append((f'{prefix}P{p+1}S{s+1}', raan, ma, shell))
+    return slots
+
+
 def build_exporters(
     scenario_cfg: dict,
     epoch:        datetime,
@@ -124,31 +152,22 @@ def build_exporters(
 ) -> List[Tuple[str, OrbitalProfileExporter]]:
     """Build one OrbitalProfileExporter per satellite in the scenario."""
     exporters = []
-    n_planes      = scenario_cfg['n_planes']
-    sats_per_plane= scenario_cfg['sats_per_plane']
-    raan_base     = scenario_cfg['raan_base']
-    raan_step     = scenario_cfg['raan_step']
-
-    for p in range(n_planes):
-        raan = raan_base + p * raan_step
-        for s in range(sats_per_plane):
-            ma   = s * (360.0 / sats_per_plane)
-            sid  = f'P{p+1}S{s+1}'
-            exp  = OrbitalProfileExporter(
-                satellite_id      = sid,
-                ground_lat_deg    = gs_lat,
-                ground_lon_deg    = gs_lon,
-                ground_alt_m      = gs_alt,
-                altitude_km       = scenario_cfg['altitude_km'],
-                inclination_deg   = scenario_cfg['inclination_deg'],
-                raan_deg          = raan,
-                mean_anomaly_deg  = ma,
-                eccentricity      = scenario_cfg['eccentricity'],
-                arg_perigee_deg   = scenario_cfg['arg_perigee'],
-                min_elevation_deg = 10.0,
-                epoch             = epoch,
-            )
-            exporters.append((sid, exp))
+    for sid, raan, ma, shell in satellite_slots(scenario_cfg):
+        exp  = OrbitalProfileExporter(
+            satellite_id      = sid,
+            ground_lat_deg    = gs_lat,
+            ground_lon_deg    = gs_lon,
+            ground_alt_m      = gs_alt,
+            altitude_km       = shell['altitude_km'],
+            inclination_deg   = shell['inclination_deg'],
+            raan_deg          = raan,
+            mean_anomaly_deg  = ma,
+            eccentricity      = shell['eccentricity'],
+            arg_perigee_deg   = shell['arg_perigee'],
+            min_elevation_deg = 10.0,
+            epoch             = epoch,
+        )
+        exporters.append((sid, exp))
     return exporters
 
 

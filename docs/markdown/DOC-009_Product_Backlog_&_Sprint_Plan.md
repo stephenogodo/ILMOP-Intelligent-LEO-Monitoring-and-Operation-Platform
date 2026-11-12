@@ -1,7 +1,7 @@
 # Product Backlog & Sprint Plan
 
 **Document ID:** DOC-009  
-**Version:** 1.2  
+**Version:** 1.3  
 **Last updated:** November 2026  
 **Status:** Sprint 7 in progress
 
@@ -112,7 +112,7 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 ## Sprint 7 — LEO Constellation Operations Suite
 
 **Version:** v0.7.0-beta  
-**Status:** 🔄 In Progress (Layers 1–6 complete; contact scheduler and ground-track trail delivered; Molniya Scenario 4 remaining)  
+**Status:** 🔄 In Progress (Layers 1–6 complete; contact scheduler and ground-track trail delivered; hybrid Scenario 4 remaining)  
 **Tests to date:** 310 new (591 cumulative)
 
 ### Completed stories
@@ -123,7 +123,7 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 | S7-02 | As a scheduler, I need a ContactWindow dataclass and window-merge utility so that overlapping passes from the same station are consolidated. | 1 | 3 | ✅ Done |
 | S7-03 | As a scheduler, I need an ILP ground station scheduler (PuLP 2.9.0) so that multi-satellite, multi-station conflicts are resolved optimally. | 2 | 13 | ✅ Done |
 | S7-04 | As a scheduler, I need a greedy fallback so that the operator gets a schedule even when the ILP solver times out. | 2 | 5 | ✅ Done |
-| S7-05 | As a network engineer, I need an ISL topology manager that checks line of sight (LOS) between satellite pairs so that inter-satellite links are only formed when the link path does not pass through the Earth. | 3 | 8 | ✅ Done |
+| S7-05 | As a network engineer, I need an ISL topology manager that checks line of sight (LOS) between satellite pairs so that inter-satellite links are only formed when the two satellites have line of sight (LOS). | 3 | 8 | ✅ Done |
 | S7-06 | As a network engineer, I need BFS shortest-hop routing over the ISL graph so that relay paths between any two satellites can be found. | 3 | 5 | ✅ Done |
 | S7-07 | As an operator, I need a ground station handover state machine (IDLE→ACQUIRING→ACTIVE→HANDING_OVER→RELEASED) so that pass transitions are tracked unambiguously. | 4 | 8 | ✅ Done |
 | S7-08 | As an operator, I need a configurable overlap margin so that brief overlaps do not trigger unnecessary handovers. | 4 | 3 | ✅ Done |
@@ -140,8 +140,8 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 | ID | User story | Layer | SP | Status |
 |----|-----------|-------|----|--------|
 | S7-15 | As an operator, I need Sprint 7 metrics integrated into the operator dashboard so that handover state, dark satellite alerts, and relay paths are visible in real time. | 7 | 8 | 🔄 In progress — ground-track trail delivered (15 tests); handover, dark and relay panels remaining |
-| S7-16 | As a demonstrator, I need a Molniya Scenario 4 (3 HEO satellites in 3 planes, RAAN 0°/120°/240°, 63.4°, ~12 h, phased by mean anomaly so apogee passes are 8 hours apart; Svalbard + Fairbanks) so that continuous high-latitude coverage and the scheduler are validated against a dual-station case. Standalone HEO scenario with its own ML model, never mixed with LEO data (ADR-016). | 7 | 8 | 🔄 Pending |
-| S7-18 | As a researcher, I need a Scenario 5 hybrid constellation (18 satellites: 6 Molniya HEO in 6 planes × 1 sat, RAAN 0°/60°/…/300°, phased so apogee passes over a given region are 4 hours apart — the Scenario 4 set of 3 plus 3 redundant satellites at RAAN 60°/180°/300°; plus 12 circular LEO as 2 planes × 6 sats, 550 km, 53°; 7 ground stations incl. Svalbard and Fairbanks; ISL between any satellite pair with line of sight (LOS) within a maximum range, including cross-plane and HEO–LEO links) so that the composite ILP and relay feedback are validated, with overlapping HEO relay hubs for dark LEO satellites and continuous coverage preserved if any single HEO satellite fails (paper P-S7-2). Scheduling and relay experiments only; no anomaly-detection training. | 7 | 8 | 🔄 Pending — estimate |
+| S7-16 | As a researcher and demonstrator, I need a hybrid Scenario 4 (18 satellites: 6 Molniya HEO in 6 planes × 1 sat, RAAN 0°/60°/…/300°, mean anomaly 60° × plane index, 63.4°, ~12 h; plus 12 circular LEO as 2 planes × 6 sats, 550 km, 53°; 7 ground stations incl. Svalbard and Fairbanks; ISL between any satellite pair with line of sight (LOS) within the range limit for its orbit-class pair — LEO–LEO 5,000 km, HEO–LEO and HEO–HEO 45,000 km) so that (1) its satellites train both Isolation Forest models, separated by orbit type (HEO_MOLNIYA from the six HEO satellites, LEO_CIRCULAR from the twelve LEO satellites, ADR-016), and (2) the composite ILP and relay-and-forward of dark satellites' data are validated through HEO relay hubs and continuous polar coverage that survives the loss of any one HEO satellite (paper P-S7-2). Replaces the former standalone Molniya Scenario 4 and the former Scenario 5 (S7-18). | 7 | 13 | 🔄 Pending — estimate revised (was 8 + 8); configuration, simulator orbit model, per-class ISL ranges and tests drafted, dashboard panels remaining |
+| S7-18 | Merged into S7-16 (hybrid Scenario 4). The former Scenario 5 no longer exists; ILMOP has four scenarios. | 7 | — | ➖ Merged |
 
 ---
 
@@ -180,7 +180,7 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 | S9-03 | As a data engineer, I need Azure Database for PostgreSQL Flexible Server with TimescaleDB extension so that historical telemetry persists in the cloud. | Should | 8 | |
 | S9-04 | As a security owner, I need Azure Key Vault so that secrets are held outside environment variables. | Should | 5 | |
 | S9-05 | As a researcher, I need MLflow artefacts migrated to Azure Blob Storage so that experiment artefacts are cloud-persisted. | Should | 5 | |
-| S9-06 | As a demonstrator, I need a five-scenario progressive cloud demo (Scenarios 1→5) so that the full system is shown running on Azure. | Should | 8 | |
+| S9-06 | As a demonstrator, I need a four-scenario progressive cloud demo (Scenarios 1→4) so that the full system is shown running on Azure. | Should | 8 | |
 | S9-07 | As a researcher, I need ADR-019 (Azure platform) published so that the cloud platform decision is formally recorded. | Must | 3 | ADR-020 already published |
 | S9-08 | As a release owner, I need the v1.0.0 tag and release so that the completed platform is formally released. | Must | 3 | |
 
@@ -201,6 +201,6 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 | Sprint 5 | 32 | 112 |
 | Sprint 6 | 49 | 161 |
 | Sprint 7 (to date) | 96 | 257 |
-| Sprint 7 (remaining) | 24 | — |
+| Sprint 7 (remaining) | 21 | — |
 | Sprint 8 (estimate) | 60 | — |
 | Sprint 9 (estimate) | 53 | — |

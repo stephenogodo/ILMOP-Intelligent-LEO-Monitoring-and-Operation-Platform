@@ -190,7 +190,7 @@
 | # | Deliverable | File | Notes |
 |---|---|---|---|
 | 6 | Relay Coordinator | `services/scheduler/relay_coordinator.py` | Uses ISL paths from Layer 3 to route data via relay satellites |
-| 9 | Molniya Scenario 4 | `run_demo.py` | 6 HEO satellites, Svalbard + Fairbanks, 8-hour apogee dwell |
+| 9 | Hybrid Scenario 4 | `run_demo.py` | 6 Molniya HEO (1 per plane) + 12 LEO (2 × 6); HEO training source and paper P-S7-2 research scenario |
 | 10 | Azure AKS manifests | `infrastructure/k8s/` | Moved to Sprint 8 |
 | 11 | ADR-019, ADR-020 | `docs/adr/` | Azure platform + ILP scheduler rationale |
 
@@ -198,8 +198,8 @@
 ILP adds value only when there are scheduling choices to make — multiple satellites
 competing for multiple ground stations simultaneously. For Scenarios 1–2, the contact
 timer is correct (one satellite, trivial scheduling). ILP earns its complexity in
-Sprint 7 with Scenario 3 (24 sats) and Scenario 4 (Molniya dual-station: Svalbard +
-Fairbanks). See ADR-020.
+Sprint 7 with Scenario 3 (24 sats) and Scenario 4 (hybrid: 6 Molniya HEO + 12 LEO,
+with Svalbard and Fairbanks among its stations). See ADR-020.
 
 ---
 

@@ -10,7 +10,7 @@ each tick.  Sprint 5 additions:
 
 import random
 from datetime import datetime, timezone, timedelta
-from typing import Literal
+from typing import Literal, Optional
 import json
 import os
 import pathlib
@@ -227,6 +227,8 @@ class TelemetryGenerator:
         inclination_deg: float = 51.6,
         altitude_km:     float = 550.0,
         mean_anomaly_deg:float = 0.0,
+        arg_perigee_deg: float = 90.0,
+        apogee_altitude_km: Optional[float] = None,
     ):
         self.satellite_id    = satellite_id
         self.orbit_type      = orbit_type
@@ -247,6 +249,8 @@ class TelemetryGenerator:
             inclination_deg  = inclination_deg,
             altitude_km      = altitude_km,
             mean_anomaly_deg = mean_anomaly_deg,
+            arg_perigee_deg  = arg_perigee_deg,
+            apogee_altitude_km = apogee_altitude_km,
         )
         self._battery = BatteryModel(initial_pct=self.satellite.battery_pct)
         self._thermal = ThermalModel(initial_temp_c=self.satellite.temperature_c)

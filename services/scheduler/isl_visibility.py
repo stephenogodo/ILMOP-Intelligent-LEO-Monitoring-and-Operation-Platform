@@ -5,8 +5,9 @@ Layer 3 — ISL Visibility Model.
 
 Determines which pairs of satellites have line-of-sight (LOS) at a
 given epoch, building a dynamic inter-satellite link (ISL) topology
-graph. Two satellites are ISL-visible if the straight line between
-them does not pass through the Earth (plus an atmospheric margin).
+graph. Two satellites are ISL-visible if they have line of sight (LOS)
+that clears the Earth plus an atmospheric margin and, optionally, lies
+within the maximum ISL range for their orbit-class pair.
 
 Depends on: Layer 1 geometry constants (EARTH_RADIUS_KM).
 """
@@ -31,6 +32,26 @@ ISL_ATMOSPHERE_MARGIN_KM: float = 100.0
 
 # Effective Earth radius for ISL occlusion checks
 ISL_EARTH_RADIUS_KM: float = EARTH_RADIUS_KM + ISL_ATMOSPHERE_MARGIN_KM
+
+
+# Maximum ISL range by orbit-class pair (Scenario 4 hybrid constellation).
+# Keys are sorted (class_a, class_b) tuples. LEO-LEO links are short-range
+# optical/RF crosslinks; any link involving an HEO satellite needs a longer
+# range because Molniya apogee radius is about 46,000 km.
+DEFAULT_ISL_RANGE_LIMITS_KM: dict[tuple[str, str], float] = {
+    ("LEO", "LEO"): 5_000.0,
+    ("HEO", "LEO"): 45_000.0,
+    ("HEO", "HEO"): 45_000.0,
+}
+
+
+def _range_limit_km(
+    class_a: str,
+    class_b: str,
+    range_limits_km: dict[tuple[str, str], float],
+) -> float | None:
+    """Maximum range for an orbit-class pair; None = unlimited."""
+    return range_limits_km.get(tuple(sorted((class_a, class_b))))
 
 
 # ---------------------------------------------------------------------------
@@ -157,6 +178,8 @@ def compute_isl_topology(
     unix_time:           float,
     earth_radius_km:     float = ISL_EARTH_RADIUS_KM,
     max_range_km:        float | None = None,
+    orbit_classes:       dict[str, str] | None = None,
+    range_limits_km:     dict[tuple[str, str], float] | None = None,
 ) -> ISLTopology:
     """
     Compute the ISL visibility topology for a constellation snapshot.
@@ -169,6 +192,13 @@ def compute_isl_topology(
     max_range_km        : optional maximum ISL range; pairs beyond this
                           distance are marked occluded even if LOS is
                           geometrically clear. None = no limit.
+    orbit_classes       : optional mapping satellite_id -> orbit class
+                          ("LEO" or "HEO"). When given, each pair is also
+                          limited by the range for its class pair.
+    range_limits_km     : class-pair range table; defaults to
+                          DEFAULT_ISL_RANGE_LIMITS_KM. Used only when
+                          orbit_classes is given. The tighter of this and
+                          max_range_km applies.
 
     Returns
     -------
@@ -186,7 +216,17 @@ def compute_isl_topology(
             pos_b    = satellite_positions[sat_b]
             range_km = float(np.linalg.norm(pos_b - pos_a))
 
-            if max_range_km is not None and range_km > max_range_km:
+            limit = max_range_km
+            if orbit_classes is not None:
+                class_limit = _range_limit_km(
+                    orbit_classes[sat_a], orbit_classes[sat_b],
+                    DEFAULT_ISL_RANGE_LIMITS_KM if range_limits_km is None
+                    else range_limits_km,
+                )
+                if class_limit is not None:
+                    limit = class_limit if limit is None else min(limit, class_limit)
+
+            if limit is not None and range_km > limit:
                 visible = False
             else:
                 visible, _ = has_line_of_sight(
@@ -211,6 +251,8 @@ def compute_isl_topology_series(
     satellite_positions_over_time: list[tuple[float, dict[str, np.ndarray]]],
     earth_radius_km: float = ISL_EARTH_RADIUS_KM,
     max_range_km:    float | None = None,
+    orbit_classes:   dict[str, str] | None = None,
+    range_limits_km: dict[tuple[str, str], float] | None = None,
 ) -> list[ISLTopology]:
     """
     Compute ISL topology at multiple epochs.
@@ -227,6 +269,7 @@ def compute_isl_topology_series(
     """
     return [
         compute_isl_topology(positions, unix_time,
-                             earth_radius_km, max_range_km)
+                             earth_radius_km, max_range_km,
+                             orbit_classes, range_limits_km)
         for unix_time, positions in satellite_positions_over_time
     ]

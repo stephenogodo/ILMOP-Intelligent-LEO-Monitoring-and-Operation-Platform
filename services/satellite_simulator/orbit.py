@@ -1,4 +1,5 @@
 import math
+from typing import Optional
 from datetime import datetime, timezone
 
 from sgp4.api import Satrec, WGS84, jday as sgp4_jday
@@ -35,9 +36,28 @@ class OrbitModel:
         inclination_deg:   float = 51.6,
         raan_deg:          float = 45.0,
         mean_anomaly_deg:  float = 0.0,
+        arg_perigee_deg:   float = 90.0,
+        apogee_altitude_km: Optional[float] = None,
     ):
+        """
+        altitude_km         : circular-orbit altitude, or the PERIGEE altitude
+                              when apogee_altitude_km is given.
+        apogee_altitude_km  : if set, the orbit is eccentric (e.g. Molniya HEO):
+                              semi-major axis and eccentricity are derived from
+                              the perigee and apogee altitudes.
+        arg_perigee_deg     : argument of perigee (270 deg for Molniya).
+        """
         self._altitude_km    = altitude_km
         self._inclination_deg = inclination_deg
+        if apogee_altitude_km is None:
+            self._semi_major_km = self.EARTH_RADIUS_KM + altitude_km
+            self._ecc           = 0.001          # near-circular (unchanged default)
+        else:
+            r_p = self.EARTH_RADIUS_KM + altitude_km
+            r_a = self.EARTH_RADIUS_KM + apogee_altitude_km
+            self._semi_major_km = 0.5 * (r_p + r_a)
+            self._ecc           = (r_a - r_p) / (r_a + r_p)
+        self._arg_perigee_deg = arg_perigee_deg
         self._sat = self._build_satellite(raan_deg, mean_anomaly_deg)
 
     # ── public API ────────────────────────────────────────────────────────────
@@ -68,7 +88,7 @@ class OrbitModel:
 
     def _build_satellite(self, raan_deg: float, mean_anomaly_deg: float) -> Satrec:
         """Initialise an SGP4 Satrec from orbital elements."""
-        a         = self.EARTH_RADIUS_KM + self._altitude_km
+        a         = self._semi_major_km
         n_rad_min = math.sqrt(self._GM_KM3_S2 / a ** 3) * 60.0   # mean motion (rad/min)
 
         yr, mo, dy = self._EPOCH
@@ -83,8 +103,8 @@ class OrbitModel:
             1.0e-4,                         # bstar (drag term)
             0.0,                            # ndot  (first deriv of mean motion)
             0.0,                            # nddot (second deriv of mean motion)
-            0.001,                          # eccentricity  (near-circular)
-            math.radians(90.0),             # argpo — argument of perigee
+            self._ecc,                      # eccentricity
+            math.radians(self._arg_perigee_deg),  # argpo — argument of perigee
             math.radians(self._inclination_deg),
             math.radians(mean_anomaly_deg),
             n_rad_min,                      # no_kozai — mean motion (rad/min)

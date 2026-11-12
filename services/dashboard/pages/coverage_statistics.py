@@ -62,6 +62,28 @@ GROUND_STATIONS = {
     'Sydney, Australia': {'lat': -33.865, 'lon': 151.210, 'alt':  20.0},
 }
 
+def satellite_slots(scenario_cfg: dict) -> list:
+    """
+    One (satellite_id, raan_deg, mean_anomaly_deg, shell) tuple per satellite.
+
+    A scenario describes its main orbit shell with the top-level keys; a hybrid
+    scenario (Scenario 4: HEO + LEO) lists further shells in 'extra_shells'.
+    Satellite IDs of the main shell are P<plane>S<slot>; those of extra shell k
+    are prefixed X<k>.
+    """
+    slots = []
+    shells = [scenario_cfg] + list(scenario_cfg.get('extra_shells', []))
+    for k, shell in enumerate(shells):
+        prefix = '' if k == 0 else f'X{k}'
+        for p in range(shell['n_planes']):
+            raan = shell['raan_base'] + p * shell['raan_step']
+            for s in range(shell['sats_per_plane']):
+                ma = (p * shell.get('ma_plane_step', 0.0)
+                      + s * (360.0 / shell['sats_per_plane'])) % 360.0
+                slots.append((f'{prefix}P{p+1}S{s+1}', raan, ma, shell))
+    return slots
+
+
 SCENARIOS = {
     'Scenario 1': {
         'n_planes': 1, 'sats_per_plane': 1,
@@ -85,11 +107,17 @@ SCENARIOS = {
         'color': '#E85D24', 'label': '24 sats / 4 planes',
     },
     'Scenario 4': {
-        'n_planes': 1, 'sats_per_plane': 6,
+        'n_planes': 6, 'sats_per_plane': 1,
         'altitude_km': 20200.0, 'inclination_deg': 63.4,
-        'raan_base': 0.0, 'raan_step': 60.0,
+        'raan_base': 0.0, 'raan_step': 60.0, 'ma_plane_step': 60.0,
         'eccentricity': 0.74, 'arg_perigee': 270.0,
-        'color': '#B034C5', 'label': '6 Molniya HEO',
+        'extra_shells': [{
+            'n_planes': 2, 'sats_per_plane': 6,
+            'altitude_km': 550.0, 'inclination_deg': 53.0,
+            'raan_base': 0.0, 'raan_step': 90.0,
+            'eccentricity': 0.001, 'arg_perigee': 0.0,
+        }],
+        'color': '#B034C5', 'label': '6 HEO + 12 LEO',
     },
 }
 
@@ -125,37 +153,32 @@ def compute_coverage_stats(
     -------
     dict with all coverage statistics.
     """
-    n_planes       = scenario_cfg['n_planes']
-    sats_per_plane = scenario_cfg['sats_per_plane']
+    slots          = satellite_slots(scenario_cfg)
     duration_s     = window_min * 60.0
     n_steps        = int(duration_s / step_s) + 1
 
     # Build per-satellite in-view time series
     sat_inview: Dict[str, List[bool]] = {}
-    for p in range(n_planes):
-        raan = scenario_cfg['raan_base'] + p * scenario_cfg['raan_step']
-        for s in range(sats_per_plane):
-            ma  = s * (360.0 / sats_per_plane)
-            sid = f'P{p+1}S{s+1}'
-            try:
-                exp = OrbitalProfileExporter(
-                    satellite_id     = sid,
-                    ground_lat_deg   = gs['lat'],
-                    ground_lon_deg   = gs['lon'],
-                    ground_alt_m     = gs['alt'],
-                    altitude_km      = scenario_cfg['altitude_km'],
-                    inclination_deg  = scenario_cfg['inclination_deg'],
-                    raan_deg         = raan,
-                    mean_anomaly_deg = ma,
-                    eccentricity     = scenario_cfg['eccentricity'],
-                    arg_perigee_deg  = scenario_cfg['arg_perigee'],
-                    min_elevation_deg= min_el_deg,
-                    epoch            = EPOCH,
-                )
-                frames = exp.export(EPOCH, duration_s=duration_s, step_s=step_s)
-                sat_inview[sid] = [f.in_view for f in frames]
-            except Exception:
-                sat_inview[sid] = [False] * n_steps
+    for sid, raan, ma, shell in slots:
+        try:
+            exp = OrbitalProfileExporter(
+                satellite_id     = sid,
+                ground_lat_deg   = gs['lat'],
+                ground_lon_deg   = gs['lon'],
+                ground_alt_m     = gs['alt'],
+                altitude_km      = shell['altitude_km'],
+                inclination_deg  = shell['inclination_deg'],
+                raan_deg         = raan,
+                mean_anomaly_deg = ma,
+                eccentricity     = shell['eccentricity'],
+                arg_perigee_deg  = shell['arg_perigee'],
+                min_elevation_deg= min_el_deg,
+                epoch            = EPOCH,
+            )
+            frames = exp.export(EPOCH, duration_s=duration_s, step_s=step_s)
+            sat_inview[sid] = [f.in_view for f in frames]
+        except Exception:
+            sat_inview[sid] = [False] * n_steps
 
     # Per-step simultaneous count
     n_actual = min(len(v) for v in sat_inview.values())
@@ -201,7 +224,7 @@ def compute_coverage_stats(
     fix_frac    = fix_epochs / max(n_actual, 1)
 
     return {
-        'n_satellites'        : n_planes * sats_per_plane,
+        'n_satellites'        : len(slots),
         'n_steps'             : n_actual,
         'window_min'          : window_min,
         'contact_fraction'    : round(contact_frac * 100, 1),

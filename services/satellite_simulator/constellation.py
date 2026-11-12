@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import yaml
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from services.satellite_simulator.telemetry import TelemetryGenerator, FaultType
 from shared.schemas.telemetry_schema import Telemetry
@@ -32,6 +32,13 @@ class SatelliteConfig:
     altitude_km:      float
     mean_anomaly_deg: float
     eccentricity:     float = 0.001
+    arg_perigee_deg:  float = 90.0
+    apogee_altitude_km: Optional[float] = None   # set for eccentric (HEO) orbits
+
+    @property
+    def orbit_class(self) -> str:
+        """'HEO' for Molniya satellites, otherwise 'LEO' (used for ISL range limits)."""
+        return "HEO" if self.orbit_type == "HEO_MOLNIYA" else "LEO"
 
 
 @dataclass
@@ -50,7 +57,11 @@ class ConstellationConfig:
         SatelliteConfig objects.
 
         Each plane entry is expanded into N satellites spaced evenly
-        in mean anomaly (360° / N spacing).
+        in mean anomaly (360° / N spacing), shifted by the plane's optional
+        ``mean_anomaly_offset_deg`` (needed for 1-satellite planes, which would
+        otherwise all start at mean anomaly 0). A plane may set its own
+        ``orbit_type`` (hybrid constellations); otherwise it inherits the
+        file-level ``orbit_type``.
         """
         with open(path) as f:
             doc = yaml.safe_load(f)
@@ -67,13 +78,16 @@ class ConstellationConfig:
                 satellites.append(SatelliteConfig(
                     satellite_id     = sat_id,
                     plane_id         = plane["plane_id"],
-                    orbit_type       = constellation_orbit_type,
+                    orbit_type       = plane.get("orbit_type", constellation_orbit_type),
                     raan_deg         = plane["raan_deg"],
                     inclination_deg  = plane["inclination_deg"],
                     altitude_km      = plane.get("altitude_km",
                                         plane.get("perigee_altitude_km", 550.0)),
-                    mean_anomaly_deg = slot * spacing,
+                    mean_anomaly_deg = (plane.get("mean_anomaly_offset_deg", 0.0)
+                                        + slot * spacing) % 360.0,
                     eccentricity     = plane.get("eccentricity", 0.001),
+                    arg_perigee_deg  = plane.get("arg_perigee_deg", 90.0),
+                    apogee_altitude_km = plane.get("apogee_altitude_km"),
                 ))
 
         return cls(
@@ -87,6 +101,10 @@ class ConstellationConfig:
     @property
     def satellite_count(self) -> int:
         return len(self.satellites)
+
+    def orbit_classes(self) -> Dict[str, str]:
+        """satellite_id -> 'LEO' | 'HEO', for compute_isl_topology(orbit_classes=...)."""
+        return {s.satellite_id: s.orbit_class for s in self.satellites}
 
 
 # ── Constellation manager ─────────────────────────────────────────────────────
@@ -126,6 +144,8 @@ class ConstellationManager:
                 inclination_deg  = sat.inclination_deg,
                 altitude_km      = sat.altitude_km,
                 mean_anomaly_deg = sat.mean_anomaly_deg,
+                arg_perigee_deg  = sat.arg_perigee_deg,
+                apogee_altitude_km = sat.apogee_altitude_km,
             )
             for sat in config.satellites
         }

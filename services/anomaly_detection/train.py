@@ -9,7 +9,8 @@ contamination (ADR-016).
 
 Usage:
     # Generate training data first (run for several minutes):
-    python run_demo.py --scenario 1 --speed 60
+    python run_demo.py --scenario 1 --speed 60   # LEO model (or Scenario 3)
+    python run_demo.py --scenario 4 --speed 60   # HEO model (HEO satellites) + more LEO data
 
     # Then train:
     python -m services.anomaly_detection.train --orbit-type LEO_CIRCULAR

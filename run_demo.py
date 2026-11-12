@@ -7,7 +7,7 @@ Usage:
     python run_demo.py --scenario 1              # 1 satellite, real time
     python run_demo.py --scenario 2              # 6 satellites, real time
     python run_demo.py --scenario 3 --speed 60  # 24 satellites, 60x speed
-    python run_demo.py --scenario 4 --speed 10  # 6 Molniya satellites
+    python run_demo.py --scenario 4 --speed 60  # 18 satellites: 6 HEO + 12 LEO
 
     # With fault injection (for anomaly detection training data):
     python run_demo.py --scenario 1 --fault battery_degradation
@@ -39,7 +39,7 @@ SCENARIO_FILES = {
     1: "config/constellations/scenario_1_single.yaml",
     2: "config/constellations/scenario_2_single_orbit.yaml",
     3: "config/constellations/scenario_3_multi_orbit.yaml",
-    4: "config/constellations/scenario_4_molniya_polar.yaml",
+    4: "config/constellations/scenario_4_hybrid_heo_leo.yaml",
 }
 
 FAULT_TYPES = {
@@ -54,7 +54,7 @@ def parse_args():
     p = argparse.ArgumentParser(description="ILMOP Constellation Demo Runner")
     p.add_argument(
         "--scenario", type=int, choices=[1, 2, 3, 4], default=1,
-        help="Constellation scenario (1=single, 2=6-sat, 3=24-sat, 4=Molniya)",
+        help="Constellation scenario (1=single, 2=6-sat, 3=24-sat, 4=hybrid 6 HEO + 12 LEO)",
     )
     p.add_argument(
         "--speed", type=float, default=1.0,

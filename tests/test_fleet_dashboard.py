@@ -44,10 +44,16 @@ SCENARIOS = {
         'eccentricity': 0.001, 'arg_perigee': 0.0,
     },
     'scenario_4': {
-        'n_planes': 1, 'sats_per_plane': 6,
+        'n_planes': 6, 'sats_per_plane': 1,
         'altitude_km': 20200.0, 'inclination_deg': 63.4,
-        'raan_base': 0.0, 'raan_step': 60.0,
+        'raan_base': 0.0, 'raan_step': 60.0, 'ma_plane_step': 60.0,
         'eccentricity': 0.74, 'arg_perigee': 270.0,
+        'extra_shells': [{
+            'n_planes': 2, 'sats_per_plane': 6,
+            'altitude_km': 550.0, 'inclination_deg': 53.0,
+            'raan_base': 0.0, 'raan_step': 90.0,
+            'eccentricity': 0.001, 'arg_perigee': 0.0,
+        }],
     },
 }
 
@@ -56,29 +62,42 @@ LAGOS     = {'lat': 6.454,  'lon': 3.395, 'alt': 41.0}
 EPOCH     = datetime(2026, 9, 22, 10, 0, 0, tzinfo=timezone.utc)
 
 
-def build_exporters(scenario_key, gs):
+def satellite_slots(cfg):
+    """Mirror of the dashboards' satellite_slots (main shell + extra_shells)."""
+    slots = []
+    for k, shell in enumerate([cfg] + list(cfg.get('extra_shells', []))):
+        prefix = '' if k == 0 else f'X{k}'
+        for p in range(shell['n_planes']):
+            raan = shell['raan_base'] + p * shell['raan_step']
+            for s in range(shell['sats_per_plane']):
+                ma = (p * shell.get('ma_plane_step', 0.0)
+                      + s * (360.0 / shell['sats_per_plane'])) % 360.0
+                slots.append((f'{prefix}P{p+1}S{s+1}', raan, ma, shell))
+    return slots
+
+
+def build_exporters(scenario_key, gs, heo_only=False):
+    """heo_only=True drops the extra (LEO) shells of the hybrid Scenario 4."""
     cfg = SCENARIOS[scenario_key]
+    if heo_only:
+        cfg = {**cfg, 'extra_shells': []}
     exporters = []
-    for p in range(cfg['n_planes']):
-        raan = cfg['raan_base'] + p * cfg['raan_step']
-        for s in range(cfg['sats_per_plane']):
-            ma  = s * (360.0 / cfg['sats_per_plane'])
-            sid = f'P{p+1}S{s+1}'
-            exp = OrbitalProfileExporter(
-                satellite_id     = sid,
-                ground_lat_deg   = gs['lat'],
-                ground_lon_deg   = gs['lon'],
-                ground_alt_m     = gs['alt'],
-                altitude_km      = cfg['altitude_km'],
-                inclination_deg  = cfg['inclination_deg'],
-                raan_deg         = raan,
-                mean_anomaly_deg = ma,
-                eccentricity     = cfg['eccentricity'],
-                arg_perigee_deg  = cfg['arg_perigee'],
-                min_elevation_deg= 10.0,
-                epoch            = EPOCH,
-            )
-            exporters.append((sid, exp))
+    for sid, raan, ma, shell in satellite_slots(cfg):
+        exp = OrbitalProfileExporter(
+            satellite_id     = sid,
+            ground_lat_deg   = gs['lat'],
+            ground_lon_deg   = gs['lon'],
+            ground_alt_m     = gs['alt'],
+            altitude_km      = shell['altitude_km'],
+            inclination_deg  = shell['inclination_deg'],
+            raan_deg         = raan,
+            mean_anomaly_deg = ma,
+            eccentricity     = shell['eccentricity'],
+            arg_perigee_deg  = shell['arg_perigee'],
+            min_elevation_deg= 10.0,
+            epoch            = EPOCH,
+        )
+        exporters.append((sid, exp))
     return exporters
 
 
@@ -98,9 +117,20 @@ class TestConstellationSize:
         exporters = build_exporters('scenario_3', CAMBRIDGE)
         assert len(exporters) == 24
 
-    def test_scenario_4_has_6_satellites(self):
+    def test_scenario_4_has_18_satellites(self):
         exporters = build_exporters('scenario_4', CAMBRIDGE)
-        assert len(exporters) == 6
+        assert len(exporters) == 18
+
+    def test_scenario_4_is_6_heo_plus_12_leo(self):
+        assert len(build_exporters('scenario_4', CAMBRIDGE, heo_only=True)) == 6
+        cfg = SCENARIOS['scenario_4']
+        (leo,) = cfg['extra_shells']
+        assert leo['n_planes'] * leo['sats_per_plane'] == 12
+        assert leo['altitude_km'] == 550.0 and leo['inclination_deg'] == 53.0
+
+    def test_scenario_4_satellite_ids_unique(self):
+        ids = [sid for sid, _ in build_exporters('scenario_4', CAMBRIDGE)]
+        assert len(ids) == len(set(ids)) == 18
 
     def test_satellite_ids_are_unique(self):
         exporters = build_exporters('scenario_3', CAMBRIDGE)
@@ -325,7 +355,7 @@ class TestHEOGroundStations:
         T_s = 2 * math.pi * math.sqrt((a * 1000) ** 3 / 3.986_004_418e14)
         window_s = 2 * T_s
 
-        exporters = build_exporters('scenario_4', self.SVALBARD)
+        exporters = build_exporters('scenario_4', self.SVALBARD, heo_only=True)
         found = False
         for sid, exp in exporters:
             frames = exp.export_in_view_only(
@@ -338,6 +368,50 @@ class TestHEOGroundStations:
             "Svalbard should see at least one Molniya satellite "
             f"in a {window_s/3600:.1f}-hour window"
         )
+
+    def _covered_fraction(self, gs, hours=24, step_s=300):
+        """Fraction of time-steps with >=1 HEO (Molniya) satellite in view."""
+        seen = set()
+        n = int(hours * 3600 / step_s)
+        for _, exp in build_exporters('scenario_4', gs, heo_only=True):
+            for fr in exp.export_in_view_only(EPOCH, duration_s=hours * 3600, step_s=step_s):
+                idx = int((fr.timestamp - EPOCH).total_seconds() // step_s)
+                if idx < n:   # export window end is inclusive
+                    seen.add(idx)
+        return len(seen) / n
+
+    def test_scenario_4_continuous_coverage_svalbard(self):
+        """S7-16: 6 HEO satellites, 1 per plane, 60 deg steps -> no coverage gaps."""
+        assert self._covered_fraction(self.SVALBARD) == 1.0
+
+    def test_scenario_4_continuous_coverage_fairbanks(self):
+        assert self._covered_fraction(self.FAIRBANKS) == 1.0
+
+    def test_scenario_4_unphased_has_gaps(self):
+        """Regression: with all mean anomalies 0 (no per-plane offset) coverage < 100 %."""
+        import tests.test_fleet_dashboard as me
+        saved = me.SCENARIOS['scenario_4']
+        me.SCENARIOS['scenario_4'] = {**saved, 'ma_plane_step': 0.0}
+        try:
+            assert self._covered_fraction(self.SVALBARD) < 1.0
+        finally:
+            me.SCENARIOS['scenario_4'] = saved
+
+    def test_scenario_4_survives_loss_of_any_one_satellite(self):
+        """S7-16 redundancy: dropping any one of the 6 still leaves no gap."""
+        n = int(24 * 3600 / 300)
+        for gs in (self.SVALBARD, self.FAIRBANKS):
+            per_sat = []
+            for _, exp in build_exporters('scenario_4', gs, heo_only=True):
+                seen = set()
+                for fr in exp.export_in_view_only(EPOCH, duration_s=24 * 3600, step_s=300):
+                    idx = int((fr.timestamp - EPOCH).total_seconds() // 300)
+                    if idx < n:
+                        seen.add(idx)
+                per_sat.append(seen)
+            for drop in range(len(per_sat)):
+                union = set().union(*[x for i, x in enumerate(per_sat) if i != drop])
+                assert len(union) == n, f"gap after losing satellite {drop}"
 
     def test_coverage_engine_has_both_heo_stations(self):
         """coverage_engine.py GROUND_STATIONS includes both HEO stations."""

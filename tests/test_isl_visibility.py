@@ -19,6 +19,7 @@ from services.scheduler.isl_visibility import (
     has_line_of_sight,
     compute_isl_topology,
     compute_isl_topology_series,
+    DEFAULT_ISL_RANGE_LIMITS_KM,
     EARTH_RADIUS_KM,
     ISL_EARTH_RADIUS_KM,
     ISL_ATMOSPHERE_MARGIN_KM,
@@ -198,3 +199,70 @@ class TestISLTopologySeries:
         series    = compute_isl_topology_series(snapshots)
         for i, topo in enumerate(series):
             assert topo.unix_time == times[i]
+
+# ---------------------------------------------------------------------------
+# S7-18: per-orbit-class ISL range limits
+# ---------------------------------------------------------------------------
+
+class TestClassRangeLimits:
+    """
+    Note: at 550 km (100 km atmosphere margin) two satellites in the same shell
+    cannot exceed about 4,910 km separation with LOS, so the 5,000 km LEO-LEO
+    limit is non-binding for the Scenario 4 shell. The 'beyond limit' cases
+    below therefore use a 1,200 km shell.
+    """
+
+    def _pair(self, alt, lon_sep_deg):
+        a = _sat_at(0.0, 0.0, alt)
+        b = _sat_at(0.0, lon_sep_deg, alt)
+        return a, b, float(np.linalg.norm(b - a))
+
+    def test_default_table_values(self):
+        assert DEFAULT_ISL_RANGE_LIMITS_KM[("LEO", "LEO")] == 5_000.0
+        assert DEFAULT_ISL_RANGE_LIMITS_KM[("HEO", "LEO")] == 45_000.0
+        assert DEFAULT_ISL_RANGE_LIMITS_KM[("HEO", "HEO")] == 45_000.0
+
+    def test_leo_leo_beyond_5000_km_not_linked(self):
+        a, b, rng = self._pair(1200.0, 40.0)          # ~5,179 km, LOS clear
+        assert rng > 5_000.0
+        assert compute_isl_topology({"L1": a, "L2": b}, T0).is_linked("L1", "L2")
+        t = compute_isl_topology({"L1": a, "L2": b}, T0,
+                                 orbit_classes={"L1": "LEO", "L2": "LEO"})
+        assert not t.is_linked("L1", "L2")
+
+    def test_leo_leo_within_5000_km_linked(self):
+        a, b, rng = self._pair(550.0, 30.0)
+        assert rng < 5_000.0
+        t = compute_isl_topology({"L1": a, "L2": b}, T0,
+                                 orbit_classes={"L1": "LEO", "L2": "LEO"})
+        assert t.is_linked("L1", "L2")
+
+    def test_550km_shell_los_limit_is_below_5000_km(self):
+        """The 5,000 km LEO-LEO limit never binds for a 550 km shell."""
+        limit = 2.0 * math.sqrt((EARTH_RADIUS_KM + ALT) ** 2 - ISL_EARTH_RADIUS_KM ** 2)
+        assert limit < 5_000.0
+
+    def test_heo_leo_longer_range_allowed(self):
+        h = np.array([0.0, 0.0, 40_000.0])
+        l = _sat_at(0.0, 0.0, 550.0)
+        rng = float(np.linalg.norm(h - l))
+        assert 5_000.0 < rng < 45_000.0
+        t = compute_isl_topology({"H1": h, "L1": l}, T0,
+                                 orbit_classes={"H1": "HEO", "L1": "LEO"})
+        assert t.is_linked("H1", "L1")
+
+    def test_heo_leo_beyond_45000_km_not_linked(self):
+        h = np.array([0.0, 0.0, 52_000.0])
+        l = np.array([6_921.0, 0.0, 0.0])
+        assert float(np.linalg.norm(h - l)) > 45_000.0
+        assert compute_isl_topology({"H1": h, "L1": l}, T0).is_linked("H1", "L1")
+        t = compute_isl_topology({"H1": h, "L1": l}, T0,
+                                 orbit_classes={"H1": "HEO", "L1": "LEO"})
+        assert not t.is_linked("H1", "L1")
+
+    def test_series_passes_class_limits_through(self):
+        a, b, _ = self._pair(1200.0, 40.0)
+        series = compute_isl_topology_series(
+            [(T0, {"L1": a, "L2": b})],
+            orbit_classes={"L1": "LEO", "L2": "LEO"})
+        assert not series[0].is_linked("L1", "L2")

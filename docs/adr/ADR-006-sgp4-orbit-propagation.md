@@ -14,7 +14,7 @@ ILMOP requires a satellite orbital position model to compute the eclipse state (
 
 ## Decision
 
-SGP4 (Simplified General Perturbations Model 4), implemented via the `sgp4` Python library (Rhodes, 2012), is the orbit propagation model for Scenarios 1–3. Scenario 4 (Molniya HEO) also uses SGP4 for operational purposes, with the accuracy limitations documented in ADR-016.
+SGP4 (Simplified General Perturbations Model 4), implemented via the `sgp4` Python library (Rhodes, 2012), is the orbit propagation model for Scenarios 1–3. The Molniya HEO satellites of Scenario 4 (a hybrid HEO + LEO scenario) also use SGP4 for operational purposes, with the accuracy limitations documented in ADR-016.
 
 ---
 

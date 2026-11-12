@@ -165,10 +165,17 @@ Six satellites equally spaced in one orbital plane. Contact fraction from Cambri
 Four orbital planes, 90° RAAN separation, six satellites per plane.
 Creates antenna scheduling conflicts that the Sprint 7 ILP scheduler resolves.
 
-### Scenario 4 — Molniya HEO polar constellation (6 satellites, standalone)
-Six satellites in Molniya orbits (63.4° inclination, eccentricity 0.74,
-apogee ~39,750 km). Continuous polar coverage with dual-satellite visibility
-from Svalbard (78.2°N) and Fairbanks (64.8°N).
+### Scenario 4 — Hybrid HEO + LEO constellation (18 satellites)
+Six Molniya satellites, one in each of six planes (RAAN 0°–300° in 60° steps;
+63.4° inclination, eccentricity 0.74, apogee ~39,750 km), plus twelve LEO
+satellites in two planes of six (550 km, 53°). The Molniya satellites give
+continuous coverage of Svalbard (78.2°N) and Fairbanks (64.8°N) and are the
+training source for the HEO anomaly-detection model; the LEO satellites add
+training data for the LEO model. Each model trains on its own `orbit_type`, so
+the two are never mixed. The whole constellation is the research scenario for
+contact scheduling and relay-and-forward of dark satellites' data (paper
+P-S7-2), with inter-satellite links between any pair with line of sight (LOS)
+within the range limit for their orbit-class pair.
 
 ---
 

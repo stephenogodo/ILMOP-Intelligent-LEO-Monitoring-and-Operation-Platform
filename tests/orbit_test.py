@@ -88,3 +88,29 @@ def test_same_time_same_result(orbit):
     r1  = orbit._propagate_at(t)
     r2  = orbit._propagate_at(t)
     assert r1 == r2, "OrbitModel must be deterministic for the same input time"
+
+
+# ── S7-16: eccentric (Molniya) orbit support ──────────────────────────────────
+
+def test_molniya_orbit_is_eccentric_with_12h_period():
+    m = OrbitModel(altitude_km=500.0, inclination_deg=63.4, raan_deg=0.0,
+                   mean_anomaly_deg=0.0, arg_perigee_deg=270.0,
+                   apogee_altitude_km=39750.0)
+    assert abs(m._ecc - 0.74) < 0.01
+    period_h = 2 * 3.141592653589793 * (m._semi_major_km ** 1.5) / (398600.4418 ** 0.5) / 3600
+    assert abs(period_h - 11.97) < 0.1
+
+def test_molniya_altitude_varies_between_perigee_and_apogee():
+    from datetime import datetime, timedelta, timezone
+    m = OrbitModel(altitude_km=500.0, inclination_deg=63.4, raan_deg=0.0,
+                   mean_anomaly_deg=0.0, arg_perigee_deg=270.0,
+                   apogee_altitude_km=39750.0)
+    yr, mo, dy = m._EPOCH
+    t0 = datetime(yr, mo, dy, tzinfo=timezone.utc)
+    alts = [m._propagate_at(t0 + timedelta(minutes=10 * i))[2] for i in range(73)]
+    assert min(alts) < 2000.0
+    assert max(alts) > 38000.0
+
+def test_circular_default_unchanged():
+    m = OrbitModel(altitude_km=550.0, inclination_deg=53.0)
+    assert m._ecc == 0.001 and m._arg_perigee_deg == 90.0

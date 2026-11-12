@@ -283,9 +283,12 @@ each tick.
   supports `time_multiplier` and `fault_type` parameters
 
 **Orbit types supported:** `LEO_CIRCULAR` (Scenarios 1–3) and
-`HEO_MOLNIYA` (Scenario 4). The `orbit_type` is read from the YAML
-and propagated to every `TelemetryGenerator` and every `Telemetry`
-record — gates ML model routing per ADR-016.
+`HEO_MOLNIYA` (the six HEO satellites of the hybrid Scenario 4, which
+also contains twelve `LEO_CIRCULAR` satellites). The `orbit_type` is read
+from the YAML (per plane, falling back to the file-level value) and
+propagated to every `TelemetryGenerator` and every `Telemetry` record —
+gates ML model routing per ADR-016, and is what separates the HEO and LEO
+training sets within Scenario 4.
 
 ---
 

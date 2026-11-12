@@ -256,8 +256,11 @@ consumed independently by every service that needs it. This means:
 ### 5.3 Orbit-type separation
 
 ILMOP maintains a strict operational and analytical separation between
-LEO circular orbit operations (Scenarios 1–3) and Molniya HEO operations
-(Scenario 4). This separation is physically motivated, not administrative.
+LEO circular orbit operations (Scenarios 1–3) and Molniya HEO operations.
+Scenario 4 contains both: its six Molniya satellites are the HEO training
+source and its twelve LEO satellites add training data for the LEO model.
+The separation is therefore per satellite, by `orbit_type`, and is physically
+motivated, not administrative.
 
 LEO circular satellites and Molniya HEO satellites have incompatible
 telemetry signatures. A Molniya satellite at apogee spends up to 8 hours
@@ -268,7 +271,10 @@ one anomaly detection model on both data types produces a confused
 baseline that fits neither orbit correctly. Each orbit type has its own
 anomaly detection model, its own MLflow experiment, and its own
 TimescaleDB query filter. The `orbit_type` field in the Telemetry
-schema (v2.0) enforces this separation at the data layer.
+schema (v2.0) enforces this separation at the data layer. Because every
+record carries the `orbit_type` of its satellite, the training query returns
+the Molniya satellites of Scenario 4 for the HEO model and its LEO satellites
+for the LEO model, never a mixture.
 
 ---
 
@@ -361,26 +367,36 @@ constellation — including the inter-plane variation in eclipse timing,
 contact duration, and thermal profiles that results from the different
 RAANs.
 
-### 6.4 Scenario 4 — Molniya HEO polar constellation (standalone)
+### 6.4 Scenario 4 — Hybrid HEO + LEO constellation
 
 | Parameter | Value |
 |-----------|-------|
-| Satellites | 6 (SAT-M1 through SAT-M6) |
-| Orbit type | HEO Molniya — inclination 63.4°, eccentricity 0.74, argument of perigee 270° |
-| Apogee altitude | 39,750 km (over northern hemisphere) |
-| Perigee altitude | 500 km |
-| Orbital period | ~12 hours (2 orbits per day) |
-| Apogee dwell | ~8 of 12 hours near apogee (satellite moves slowly) |
-| Contact duration | Up to 8 continuous hours from Svalbard (78°N) or Fairbanks (65°N) |
-| Eclipse fraction | ~5–15% (much lower than LEO — satellite mostly in sunlight at high altitude) |
-| Primary ground stations | Svalbard (78.2°N, 15.4°E) and Fairbanks (64.8°N, 147.7°W) |
-| ML model | HEO_MOLNIYA — separate model, never trained on LEO data |
-| Primary purpose | Polar coverage demonstration; long-dwell remote sensing; antenna handover; standalone HEO operations |
+| Satellites | 18: 6 Molniya HEO (SAT-MA1 through SAT-MF1, one per plane) and 12 LEO (SAT-LA1 to SAT-LA6, SAT-LB1 to SAT-LB6) |
+| HEO orbit | Molniya — inclination 63.4°, eccentricity 0.74, argument of perigee 270°, RAAN 0°/60°/…/300°, mean anomaly 60° × plane index |
+| HEO apogee / perigee altitude | 39,750 km (over northern hemisphere) / 500 km |
+| HEO orbital period | ~12 hours (2 orbits per day) |
+| HEO apogee dwell | ~8 of 12 hours near apogee (satellite moves slowly) |
+| HEO contact duration | Up to 8 continuous hours from Svalbard (78°N) or Fairbanks (65°N) |
+| HEO eclipse fraction | ~5–15% (much lower than LEO — satellite mostly in sunlight at high altitude) |
+| LEO shell | 2 planes × 6 satellites, RAAN 0°/90°, 550 km, 53° |
+| Primary ground stations | Svalbard (78.2°N, 15.4°E) and Fairbanks (64.8°N, 147.7°W); the scenario also uses Cambridge, Houston, Tokyo, Lagos and Sydney |
+| Inter-satellite links | Any pair with line of sight (LOS) within the range limit for its orbit-class pair: LEO–LEO 5,000 km; HEO–LEO and HEO–HEO 45,000 km |
+| ML models | Two Isolation Forest models, each trained on its own orbit type: HEO_MOLNIYA on the six HEO satellites, LEO_CIRCULAR on the twelve LEO satellites together with Scenarios 1–3 |
+| Purposes | (1) anomaly-detection training: the HEO model, and additional LEO data; (2) the research scenario for paper P-S7-2: composite-ILP contact scheduling and relay-and-forward of dark satellites' data through HEO relay hubs; polar coverage and antenna handover |
 
-Scenario 4 is operated as a completely independent mission. It never
-runs concurrently with Scenarios 1–3 in the same ML training context,
-and its telemetry is stored with `orbit_type = 'HEO_MOLNIYA'` to
-prevent cross-contamination of training data.
+Scenario 4 emits telemetry for both orbit types, each record carrying its
+satellite's `orbit_type` (`HEO_MOLNIYA` or `LEO_CIRCULAR`). The HEO
+telemetry reaches only the HEO training set and the LEO telemetry only the LEO
+training set, so the two are never mixed in one training dataset.
+
+The six Molniya satellites sit in six planes, spaced 60° in RAAN and phased
+60° in mean anomaly. This gives continuous coverage of Svalbard and Fairbanks
+that survives the loss of any one satellite, and it places the apogee dwell
+over six different longitudes, so mid-latitude stations such as Cambridge,
+Houston and Tokyo also see a Molniya satellite almost continuously. The
+LEO satellites are out of ground-station view most of the time, so the
+scheduler has contacts to arbitrate and dark LEO satellites to relay through
+the HEO satellites over inter-satellite links.
 
 The 63.4° inclination is not arbitrary — it is the critical angle at
 which the J2 Earth oblateness perturbation produces zero net precession
@@ -393,9 +409,8 @@ Scenario 4 dashboard: a Molniya satellite at apogee moves slowly enough
 that an operator can plan an entire day's commanding within a single
 8-hour contact window. Antenna handover — transferring a contact from
 Svalbard to Fairbanks as one satellite descends toward perigee — is
-demonstrated with the 6-satellite spacing (60° mean anomaly separation)
-that ensures a second satellite is always rising to apogee as the first
-descends.
+demonstrated with the 60° phasing of the six Molniya satellites, which
+ensures another satellite is always rising to apogee as the first descends.
 
 ---
 
@@ -501,7 +516,7 @@ following automated actions occur within the first 30 seconds:
 #### Active contact
 
 During the contact window (5–10 minutes for LEO; up to 8 hours for
-Molniya Scenario 4), the operator can:
+the Molniya satellites of Scenario 4), the operator can:
 
 - Review incoming telemetry for anomalies that emerged since the last
   contact.
@@ -833,7 +848,7 @@ day over a fixed mid-latitude ground target. The operational procedure is:
 
 #### Polar remote sensing (Scenario 4)
 
-The Molniya constellation's long apogee dwell provides operational
+The Molniya satellites' long apogee dwell in Scenario 4 provides operational
 conditions fundamentally different from LEO remote sensing:
 
 1. Configure the Scenario 4 ground stations (Svalbard, Fairbanks) to
@@ -875,7 +890,9 @@ resolved in future sprints but deliberate architectural decisions:
 - **LEO and Molniya telemetry are never combined in one ML training
   dataset.** This is enforced through the `orbit_type` field in the
   Telemetry schema and the TimescaleDB query filters used in training
-  data export.
+  data export. Scenario 4 contains both orbit types: its Molniya
+  satellites feed only the HEO training set and its LEO satellites only the
+  LEO training set.
 
 - **The HPOP NavigationTruthModel is used only for the navigation
   validation pipeline.** SGP4 is used for all operational purposes —
@@ -929,8 +946,8 @@ resolved in future sprints but deliberate architectural decisions:
    at LEO altitudes. Sub-kilometre positional accuracy is not required
    for these applications.
 
-3. The Isolation Forest anomaly detection model, trained on Scenario 1–3
-   telemetry, will generalise to anomaly patterns not present in the
+3. The Isolation Forest anomaly detection model, trained on LEO telemetry
+   (Scenarios 1–3) and, for the HEO model, on the Scenario 4 Molniya telemetry, will generalise to anomaly patterns not present in the
    training data, provided those anomalies represent meaningful deviations
    from the eclipse-correlated normal baseline.
 
@@ -1005,9 +1022,8 @@ See ADR-014 (Isolation Forest), ADR-015 (MLflow), and ADR-016
   simultaneous visibility) are computed and displayed per scenario.
 
 - **Four-scenario progressive demonstration:** the complete demonstration
-  sequence from one satellite to 24, followed by the standalone Molniya
-  polar demonstration, is runnable end-to-end as a coherent operational
-  narrative.
+  sequence from one satellite to 24, followed by the hybrid HEO + LEO
+  Scenario 4, is runnable end-to-end as a coherent operational narrative.
 
 ### 15.3 Sprint 7 — Cloud-native and autonomous operations
 
@@ -1022,10 +1038,11 @@ See ADR-014 (Isolation Forest), ADR-015 (MLflow), and ADR-016
   Azure Database for PostgreSQL (TimescaleDB). Application code is
   unchanged — only environment variables change.
 
-- **Molniya standalone operations:** Scenario 4 is operated end-to-end
-  as a standalone mission with its own scheduler (tuned for long-dwell
-  contact windows), its own HEO_MOLNIYA anomaly detection model, and
-  dedicated polar ground stations.
+- **Hybrid Scenario 4 operations:** Scenario 4 (six Molniya HEO plus twelve
+  LEO satellites) trains the HEO_MOLNIYA anomaly detection model on its
+  Molniya satellites (and adds LEO data to the LEO model), and is the scenario in which the composite-ILP
+  contact scheduler and the relay-and-forward of dark satellites' data
+  through the HEO satellites are demonstrated for paper P-S7-2.
 
 ---
 

@@ -135,12 +135,12 @@ class TestCoverageStats:
         """Single satellite can never provide 4+ simultaneous → fix fraction = 0."""
         assert stats_s1['fix_fraction'] == 0.0
 
-    def test_scenario_4_has_6_satellites(self):
+    def test_scenario_4_has_18_satellites(self):
         stats = compute_coverage_stats(
             SCENARIOS['Scenario 4'], CAMBRIDGE,
             window_min=60, step_s=STEP_S
         )
-        assert stats['n_satellites'] == 6
+        assert stats['n_satellites'] == 18
 
     def test_scenario_4_different_from_scenario_1(self):
         """Molniya and LEO circular give different coverage patterns."""
