@@ -12,7 +12,7 @@ Four constellation scenarios are selectable:
 
     Scenario 1 — 1 satellite,  1 plane,   550 km, 51.6°
     Scenario 2 — 6 satellites, 1 plane,   550 km, 53.0°
-    Scenario 3 — 24 satellites, 4 planes, 550 km, 53.0°
+    Scenario 3 — 24 satellites, 4 planes, 550 km, 53.0°cl
     Scenario 4 — 6 Molniya HEO satellites, 63.4°, e=0.74
 
 The dashboard operates in two modes:
@@ -437,6 +437,14 @@ with st.sidebar:
 
     show_passes = st.toggle('Show pass schedule', value=True)
 
+    sim_speed = st.select_slider(
+        'Simulation speed',
+        options=[1, 10, 60, 300, 600],
+        value=1,
+        format_func=lambda v: f'x{v}',
+        help='Simulated seconds per real second. Use x60 or higher to see the trail build quickly',
+    )
+
     refresh_s = st.slider(
         'Refresh interval (s)', min_value=5, max_value=60, value=10
     )
@@ -458,9 +466,15 @@ with st.sidebar:
 
 now_utc = datetime.now(tz=timezone.utc)
 MODEL_EPOCH = datetime(2026, 9, 22, 10, 0, 0, tzinfo=timezone.utc)
-if 'sim_start' not in st.session_state:
-    st.session_state.sim_start = time.time()
-sim_elapsed = time.time() - st.session_state.sim_start
+# Accumulate simulated time per refresh so changing the speed never makes the
+# clock jump: each rerun adds (real seconds elapsed x current speed).
+_wall_now = time.time()
+if 'sim_elapsed' not in st.session_state:
+    st.session_state.sim_elapsed = 0.0
+    st.session_state.last_wall   = _wall_now
+st.session_state.sim_elapsed += (_wall_now - st.session_state.last_wall) * sim_speed
+st.session_state.last_wall    = _wall_now
+sim_elapsed = st.session_state.sim_elapsed
 sim_now = MODEL_EPOCH + timedelta(seconds=sim_elapsed)
 
 st.markdown(f"""
@@ -634,7 +648,7 @@ fig.update_layout(
     ),
 )
 
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, width='stretch')
 
 
 # ── trail info bar ────────────────────────────────────────────────────────────
@@ -676,7 +690,7 @@ with col_left:
                 'Azimuth'   : f"{p['azimuth_deg']:.1f}°",
                 'Rng rate'  : f"{p['range_rate']:+.0f} m/s",
             })
-        st.dataframe(rows, use_container_width=True, height=320)
+        st.dataframe(rows, width='stretch', height=320)
     else:
         st.info('No satellite positions available — check orbital parameters.')
 
@@ -693,7 +707,7 @@ with col_right:
                 'Max El (°)'   : f"{p['max_el']:.1f}",
                 'In (min)'     : f"{p['minutes_away']:.0f}",
             })
-        st.dataframe(pass_rows, use_container_width=True, height=320)
+        st.dataframe(pass_rows, width='stretch', height=320)
     else:
         st.subheader('📊 Navigation geometry summary')
         st.metric('Range resolution Δr',
