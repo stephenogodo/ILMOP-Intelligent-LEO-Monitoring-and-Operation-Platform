@@ -275,8 +275,8 @@ class TelemetryGenerator:
         # Advance simulated clock
         self._sim_time += timedelta(seconds=dt_s)
 
-        # 1. Orbit — propagate to current simulated time
-        lat, lon, alt, in_eclipse = self._orbit.propagate()
+        # 1. Orbit — propagate to the simulated clock (not wall-clock time)
+        lat, lon, alt, in_eclipse = self._orbit.propagate(self._sim_time)
         sat.latitude_deg  = lat
         sat.longitude_deg = lon
         sat.altitude_km   = alt

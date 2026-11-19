@@ -101,3 +101,30 @@ def test_serialisable_to_json(gen):
     assert "satellite_id" in record
     assert "in_eclipse" in record
     assert "solar_panel_power_w" in record
+
+
+# ── Orbit follows the simulated clock (time_multiplier) ──────────────────────
+
+def test_eclipse_cycles_at_accelerated_speed(tmp_path, monkeypatch):
+    """
+    Regression: generate() advanced the simulated clock but propagated the
+    orbit to wall-clock time, so at --speed 60 each satellite's eclipse flag
+    stayed constant (0 % or 100 % of the run) while the battery model ran at
+    speed. 200 ticks at 60x is 12,000 s, about two LEO orbits, so the flag
+    must toggle.
+    """
+    import services.satellite_simulator.telemetry as tm
+    monkeypatch.setattr(tm, "_STATE_DIR", tmp_path)
+    g = TelemetryGenerator(satellite_id="SAT-SPEED", time_multiplier=60.0)
+    flags = [g.generate().in_eclipse for _ in range(200)]
+    transitions = sum(a != b for a, b in zip(flags, flags[1:]))
+    assert transitions >= 3
+    assert 0.2 < sum(flags) / len(flags) < 0.5
+
+
+def test_orbit_propagate_accepts_explicit_time():
+    from datetime import datetime, timezone
+    from services.satellite_simulator.orbit import OrbitModel
+    o = OrbitModel()
+    t = datetime(2026, 9, 22, 10, 0, tzinfo=timezone.utc)
+    assert o.propagate(t) == o._propagate_at(t)

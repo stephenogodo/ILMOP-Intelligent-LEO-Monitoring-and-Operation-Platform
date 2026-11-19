@@ -62,12 +62,17 @@ class OrbitModel:
 
     # ── public API ────────────────────────────────────────────────────────────
 
-    def propagate(self):
+    def propagate(self, utc: Optional[datetime] = None):
         """
-        Propagate to the current UTC time.
+        Propagate to `utc`, or to the current UTC time when omitted.
+
+        The telemetry generator passes its simulated clock so the orbit
+        advances with time_multiplier; without it the orbit would run in
+        wall-clock time while the battery and contact models run at speed.
         Returns (latitude_deg, longitude_deg, altitude_km, in_eclipse).
         """
-        return self._propagate_at(datetime.now(timezone.utc))
+        return self._propagate_at(utc if utc is not None
+                                  else datetime.now(timezone.utc))
 
     # ── internal helpers ──────────────────────────────────────────────────────
 
