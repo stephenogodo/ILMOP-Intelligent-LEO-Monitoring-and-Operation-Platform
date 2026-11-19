@@ -146,7 +146,7 @@
 | 4 | Ground Station Handover | `services/scheduler/handover.py` | 34/34 | ✅ Complete |
 | 5 | Dark Satellite Detection | `services/scheduler/dark_satellite.py` | 24/24 | ✅ Complete |
 | 6 | Relay Coordinator | `services/scheduler/relay_coordinator.py` | 24/24 | ✅ Complete |
-| 7 | Dashboard Integration | `services/dashboard/pages/fleet_dashboard.py` | 15/15 trail | ✅ Complete |
+| 7 | Dashboard Integration | `services/dashboard/pages/fleet_dashboard.py` | 15/15 trail, 14/14 panels | ✅ Complete |
 
 **Layer details:**
 

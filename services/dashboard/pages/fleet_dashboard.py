@@ -54,6 +54,11 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 
 from services.otfs.orbital_profile import OrbitalProfileExporter, OrbitalFrame
+from services.dashboard.panel_data import (
+    DARK_HORIZON_S, INITIAL_DATA_AGE_S, QUEUE_CAP_MB, QUEUE_GROWTH_MB_S,
+    build_panel_context, build_panel_snapshot, horizon_bucket,
+)
+from services.scheduler.relay_coordinator import ISL_RATE_MBPS, MAX_RELAY_HOPS
 from services.navigation.validator  import NavigationValidator
 
 # ── constants ─────────────────────────────────────────────────────────────────
@@ -738,6 +743,93 @@ with col_right:
                            key=lambda p: p['elevation_deg'])
             st.metric('Best satellite',
                       f"{max_el_p['id']} at {max_el_p['elevation_deg']:.1f}°")
+
+
+# ── S7-15 operations panels: handover, dark satellites, relay ────────────────
+
+st.divider()
+st.header('🛰️ Operations — handover, dark satellites, relay')
+show_ops = st.toggle('Show operations panels', value=True,
+                     help='Contact schedule (ILP), handover state, dark satellites '
+                          'and ISL relay-and-forward for the selected scenario')
+
+if show_ops:
+    @st.cache_resource(show_spinner='Building contact schedule…')
+    def _ops_context(scn_name: str, bucket_unix: float):
+        return build_panel_context(
+            SCENARIOS[scn_name], satellite_slots(SCENARIOS[scn_name]),
+            GROUND_STATIONS, bucket_unix,
+        )
+
+    _now_unix = sim_now.timestamp()
+    _ctx  = _ops_context(scenario_name, horizon_bucket(_now_unix))
+    _snap = build_panel_snapshot(_ctx, _now_unix)
+
+    _m1, _m2, _m3, _m4 = st.columns(4)
+    _m1.metric('Windows (scheduled / found)', f'{_snap.n_scheduled} / {_snap.n_windows}')
+    _m2.metric('Dark satellites now', f'{len(_snap.dark_ids)} / {len(_snap.dark)}')
+    _m3.metric('Visible ISL links', len(_snap.isl_topology.visible_links))
+    _m4.metric('Scheduler', _snap.solver_status)
+
+    tab_ho, tab_dark, tab_relay = st.tabs(['Handover', 'Dark satellites', 'Relay'])
+
+    def _fmt_s(v):
+        if v is None:
+            return '—'
+        v = int(v)
+        return f'{v // 3600}h {(v % 3600) // 60:02d}m' if v >= 3600 else f'{v // 60}m {v % 60:02d}s'
+
+    with tab_ho:
+        st.caption('Control authority per satellite from the scheduled contact windows.')
+        st.dataframe([{
+            'Satellite': r.satellite_id, 'Orbit': r.orbit_class, 'State': r.state,
+            'Station': r.station or '—', 'Next event in': _fmt_s(r.next_event_s),
+            'Next station': r.next_station or '—',
+        } for r in _snap.handover], width='stretch', height=340)
+
+    with tab_dark:
+        st.caption(
+            f'Dark = no scheduled ground contact within the next {int(DARK_HORIZON_S // 60)} min. '
+            f'Data age and queue are modelled (assumed {int(INITIAL_DATA_AGE_S // 60)} min age '
+            f'at horizon start, {QUEUE_GROWTH_MB_S} MB/s growth, {int(QUEUE_CAP_MB)} MB cap).')
+        st.dataframe([{
+            'Satellite': r.satellite_id, 'Orbit': r.orbit_class,
+            'Status': '🌑 DARK' if r.is_dark else '✅ In contact soon',
+            'Next contact in': _fmt_s(r.next_contact_s),
+            'Dark share of horizon': f'{100 * r.dark_fraction:.0f}%',
+            'Data age': _fmt_s(r.data_age_s), 'Queue (MB)': f'{r.queue_mb:.0f}',
+        } for r in sorted(_snap.dark, key=lambda r: (not r.is_dark, r.satellite_id))],
+            width='stretch', height=340)
+
+    with tab_relay:
+        st.caption(f'Relay-and-forward: a satellite in ground contact collects the '
+                   f'queues of dark satellites over ISL (≤ {MAX_RELAY_HOPS} hops, '
+                   f'{ISL_RATE_MBPS:.0f} Mbps, per-class range limits).')
+        if not _snap.relay:
+            st.info('No contact window in the schedule horizon.')
+        for r in _snap.relay:
+            ses = r.session
+            _when = ('active now' if r.window_active
+                     else f'AOS in {_fmt_s(r.window_start_unix - _now_unix)}')
+            with st.expander(
+                    f'{r.contact_satellite} @ {r.station} — {_when} · '
+                    f'{ses.total_relayed_mb:.0f} MB relayed, '
+                    f'{len(ses.dark_serviced)} serviced, '
+                    f'{len(ses.dark_unreachable)} unreachable',
+                    expanded=r.window_active):
+                if ses.collections:
+                    st.dataframe([{
+                        'Dark satellite': c.satellite_id,
+                        'Path': ' → '.join(c.relay_path),
+                        'Hops': len(c.relay_path) - 1,
+                        'Priority': f'{c.priority:.2f}',
+                        'Relayed (MB)': f'{c.relayed_mb:.0f}',
+                        'Time (s)': f'{c.time_used_s:.0f}',
+                    } for c in ses.collections], width='stretch')
+                if ses.dark_unreachable:
+                    st.write('No ISL path: ' + ', '.join(ses.dark_unreachable))
+                if ses.dark_skipped:
+                    st.write('Reachable but not collected: ' + ', '.join(ses.dark_skipped))
 
 
 # ── coverage bar ──────────────────────────────────────────────────────────────

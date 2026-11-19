@@ -112,7 +112,7 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 ## Sprint 7 — LEO Constellation Operations Suite
 
 **Version:** v0.7.0-beta  
-**Status:** 🔄 In Progress (Layers 1–6 complete; contact scheduler and ground-track trail delivered; hybrid Scenario 4 remaining)  
+**Status:** 🔄 In Progress (Layers 1–6 complete; contact scheduler, ground-track trail and handover / dark-satellite / relay panels delivered; hybrid Scenario 4 validation remaining)  
 **Tests to date:** 310 new (591 cumulative)
 
 ### Completed stories
@@ -139,8 +139,8 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 
 | ID | User story | Layer | SP | Status |
 |----|-----------|-------|----|--------|
-| S7-15 | As an operator, I need Sprint 7 metrics integrated into the operator dashboard so that handover state, dark satellite alerts, and relay paths are visible in real time. | 7 | 8 | 🔄 In progress — ground-track trail delivered (15 tests); handover, dark and relay panels remaining |
-| S7-16 | As a researcher and demonstrator, I need a hybrid Scenario 4 (18 satellites: 6 Molniya HEO in 6 planes × 1 sat, RAAN 0°/60°/…/300°, mean anomaly 60° × plane index, 63.4°, ~12 h; plus 12 circular LEO as 2 planes × 6 sats, 550 km, 53°; 7 ground stations incl. Svalbard and Fairbanks; ISL between any satellite pair with line of sight (LOS) within the range limit for its orbit-class pair — LEO–LEO 5,000 km, HEO–LEO and HEO–HEO 45,000 km) so that (1) its satellites train both Isolation Forest models, separated by orbit type (HEO_MOLNIYA from the six HEO satellites, LEO_CIRCULAR from the twelve LEO satellites, ADR-016), and (2) the composite ILP and relay-and-forward of dark satellites' data are validated through HEO relay hubs and continuous polar coverage that survives the loss of any one HEO satellite (paper P-S7-2). Replaces the former standalone Molniya Scenario 4 and the former Scenario 5 (S7-18). | 7 | 13 | 🔄 Pending — estimate revised (was 8 + 8); configuration, simulator orbit model, per-class ISL ranges and tests drafted, dashboard panels remaining |
+| S7-15 | As an operator, I need Sprint 7 metrics integrated into the operator dashboard so that handover state, dark satellite alerts, and relay paths are visible in real time. | 7 | 8 | ✅ Done — ground-track trail (15 tests); handover, dark-satellite and relay panels on the fleet dashboard (`services/dashboard/panel_data.py`, 14 tests; ILP schedule cached per simulated hour) |
+| S7-16 | As a researcher and demonstrator, I need a hybrid Scenario 4 (18 satellites: 6 Molniya HEO in 6 planes × 1 sat, RAAN 0°/60°/…/300°, mean anomaly 60° × plane index, 63.4°, ~12 h; plus 12 circular LEO as 2 planes × 6 sats, 550 km, 53°; 7 ground stations incl. Svalbard and Fairbanks; ISL between any satellite pair with line of sight (LOS) within the range limit for its orbit-class pair — LEO–LEO 5,000 km, HEO–LEO and HEO–HEO 45,000 km) so that (1) its satellites train both Isolation Forest models, separated by orbit type (HEO_MOLNIYA from the six HEO satellites, LEO_CIRCULAR from the twelve LEO satellites, ADR-016), and (2) the composite ILP and relay-and-forward of dark satellites' data are validated through HEO relay hubs and continuous polar coverage that survives the loss of any one HEO satellite (paper P-S7-2). Replaces the former standalone Molniya Scenario 4 and the former Scenario 5 (S7-18). | 7 | 13 | 🔄 Pending — estimate revised (was 8 + 8); configuration, simulator orbit model, per-class ISL ranges, tests and dashboard scenario selection delivered; relay-validation results and the Isolation Forest training run remaining |
 | S7-18 | Merged into S7-16 (hybrid Scenario 4). The former Scenario 5 no longer exists; ILMOP has four scenarios. | 7 | — | ➖ Merged |
 
 ---
@@ -201,6 +201,6 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 | Sprint 5 | 32 | 112 |
 | Sprint 6 | 49 | 161 |
 | Sprint 7 (to date) | 96 | 257 |
-| Sprint 7 (remaining) | 21 | — |
+| Sprint 7 (remaining) | 13 | — |
 | Sprint 8 (estimate) | 60 | — |
 | Sprint 9 (estimate) | 53 | — |
