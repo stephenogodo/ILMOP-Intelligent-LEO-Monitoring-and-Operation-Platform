@@ -188,3 +188,41 @@ def test_isl_topology_uses_class_ranges(snapshot):
         a, b = s.orbit_classes[link.sat_a], s.orbit_classes[link.sat_b]
         if a == b == 'LEO':
             assert link.range_km <= 5000.0
+
+
+def test_scheduled_windows_never_overlap_at_a_station_or_for_a_satellite(snapshot):
+    ctx, _ = snapshot
+    sch = ctx.schedule.scheduled_windows
+    for i, a in enumerate(sch):
+        for b in sch[i + 1:]:
+            if a.aos_unix < b.los_unix and b.aos_unix < a.los_unix:
+                assert a.station.name != b.station.name
+                assert a.satellite_id != b.satellite_id
+
+
+def test_seven_station_schedule_is_not_throttled_by_chained_conflicts():
+    """Regression for S7-15: chain-merged conflict groups scheduled 8 of 120
+    windows (greedy and ILP alike); with pairwise exclusion the 7-station
+    scenario schedules more than 10 % of its windows even with the greedy
+    solver (17-29 / 120 measured; the ILP schedules 68 / 120)."""
+    stations = dict(STATIONS)
+    stations.update({
+        'Cambridge': {'lat': 52.205, 'lon': 0.119, 'alt': 20.0},
+        'Lagos':     {'lat': 6.454, 'lon': 3.395, 'alt': 41.0},
+        'Sydney':    {'lat': -33.865, 'lon': 151.21, 'alt': 20.0},
+        'Fairbanks': {'lat': 64.838, 'lon': -147.716, 'alt': 136.0},
+    })
+    ctx = build_panel_context(SCENARIO, slots(SCENARIO), stations,
+                              horizon_bucket(NOW), use_greedy=True)
+    sched = ctx.schedule
+    assert len(sched.scheduled_windows) > 0.1 * len(sched.all_windows)
+
+
+def test_concurrent_relay_sessions_do_not_collect_the_same_satellite_twice(snapshot):
+    _, s = snapshot
+    seen = set()
+    for rr in s.relay:
+        if rr.window_active:
+            serviced = set(rr.session.dark_serviced)
+            assert not serviced & seen
+            seen |= serviced

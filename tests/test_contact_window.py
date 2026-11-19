@@ -32,6 +32,7 @@ from services.scheduler.contact_window import (
     ContactWindow,
     scan_visibility,
     find_conflicts,
+    find_exclusion_groups,
     solve_schedule,
     greedy_schedule,
     build_contact_schedule,
@@ -757,3 +758,84 @@ class TestBuildContactSchedule:
             gamma              = 0.2,
         )
         assert result.weights_used == (0.6, 0.2, 0.2)
+
+
+# ---------------------------------------------------------------------------
+# Exclusion groups (pairwise overlap + one station per satellite)
+# ---------------------------------------------------------------------------
+
+def _w(sat, station, aos, los, **kw):
+    return ContactWindow(sat, station, aos, los, 45.0, los - aos, **kw)
+
+
+def _overlap(a, b):
+    return a.aos_unix < b.los_unix and b.aos_unix < a.los_unix
+
+
+class TestExclusionGroups:
+
+    def test_chain_is_not_one_group(self):
+        """A overlaps B, B overlaps C, A and C do not overlap: two cliques."""
+        a = _w("S1", SVALBARD, T0,        T0 + 500)
+        b = _w("S2", SVALBARD, T0 + 400,  T0 + 900)
+        c = _w("S3", SVALBARD, T0 + 800,  T0 + 1300)
+        groups = find_exclusion_groups([a, b, c])
+        assert sorted(groups) == [[0, 1], [1, 2]]
+
+    def test_long_window_does_not_block_a_disjoint_window_via_chaining(self):
+        """Chained groups let the ILP keep A and C when B is the loser."""
+        a = _w("S1", SVALBARD, T0,        T0 + 500)
+        b = _w("S2", SVALBARD, T0 + 400,  T0 + 900, relay_value=0.0)
+        c = _w("S3", SVALBARD, T0 + 800,  T0 + 1300)
+        groups = find_exclusion_groups([a, b, c])
+        result = solve_schedule([a, b, c], groups)
+        sched = {w.satellite_id for w in result.scheduled_windows}
+        assert sched == {"S1", "S3"} or sched == {"S2"}
+        # the chain-merged grouping would have allowed only one window
+        assert len(result.scheduled_windows) in (1, 2)
+        assert not any(_overlap(x, y) for i, x in enumerate(result.scheduled_windows)
+                       for y in result.scheduled_windows[i + 1:])
+
+    def test_touching_windows_do_not_conflict(self):
+        a = _w("S1", SVALBARD, T0,       T0 + 500)
+        b = _w("S2", SVALBARD, T0 + 500, T0 + 900)
+        assert find_exclusion_groups([a, b]) == []
+
+    def test_satellite_exclusivity_across_stations(self):
+        a = _w("S1", SVALBARD,  T0, T0 + 500)
+        b = _w("S1", FAIRBANKS, T0 + 100, T0 + 600)
+        assert find_exclusion_groups([a, b]) == [[0, 1]]
+        assert find_exclusion_groups([a, b], one_station_per_satellite=False) == []
+
+    def test_different_satellites_different_stations_free(self):
+        a = _w("S1", SVALBARD,  T0, T0 + 500)
+        b = _w("S2", FAIRBANKS, T0, T0 + 500)
+        assert find_exclusion_groups([a, b]) == []
+
+    def test_ilp_schedules_no_overlap_at_station_or_for_satellite(self):
+        ws = [
+            _w("S1", SVALBARD,  T0,       T0 + 600),
+            _w("S1", FAIRBANKS, T0 + 100, T0 + 700),
+            _w("S2", SVALBARD,  T0 + 300, T0 + 900),
+            _w("S2", FAIRBANKS, T0 + 650, T0 + 1200),
+        ]
+        result = solve_schedule(ws, find_exclusion_groups(ws))
+        sch = result.scheduled_windows
+        for i, x in enumerate(sch):
+            for y in sch[i + 1:]:
+                if _overlap(x, y):
+                    assert x.station.name != y.station.name
+                    assert x.satellite_id != y.satellite_id
+
+    def test_greedy_respects_overlapping_groups(self):
+        ws = [
+            _w("S1", SVALBARD,  T0,       T0 + 600),
+            _w("S1", FAIRBANKS, T0 + 100, T0 + 700),
+            _w("S2", SVALBARD,  T0 + 300, T0 + 900),
+        ]
+        result = greedy_schedule(ws, find_exclusion_groups(ws))
+        sch = result.scheduled_windows
+        for i, x in enumerate(sch):
+            for y in sch[i + 1:]:
+                assert not (_overlap(x, y) and (x.station.name == y.station.name
+                                                or x.satellite_id == y.satellite_id))

@@ -5,7 +5,7 @@ Layer 2 — ILP Contact Window Scheduler.
 
 Scans a planning horizon, identifies all satellite-ground station
 visibility windows, detects conflicts (two satellites visible from
-the same station simultaneously), and solves an Integer Linear
+the same station simultaneously, or one satellite at two stations), and solves an Integer Linear
 Programme to produce a conflict-free, maximum-score contact schedule.
 
 Composite objective (S7-14)
@@ -314,6 +314,71 @@ def find_conflicts(windows: list[ContactWindow]
     return conflict_groups
 
 
+def _overlap_cliques(indices: list[int], windows: list[ContactWindow]
+                     ) -> list[list[int]]:
+    """
+    Maximal sets of mutually overlapping windows among `indices`.
+
+    Time intervals form an interval graph, whose maximal cliques are the
+    sets of windows active at an instant just before a window closes. Two
+    windows overlap when aos_a < los_b and aos_b < los_a (touching windows
+    do not overlap).
+    """
+    events = []                       # (time, kind, idx); kind 0 = end, 1 = start
+    for i in indices:
+        events.append((windows[i].aos_unix, 1, i))
+        events.append((windows[i].los_unix, 0, i))
+    events.sort(key=lambda e: (e[0], e[1]))   # ends before starts at ties
+
+    cliques, active, last_was_start = [], set(), False
+    for _, kind, i in events:
+        if kind == 1:
+            active.add(i)
+            last_was_start = True
+        else:
+            if last_was_start and len(active) > 1:
+                cliques.append(sorted(active))
+            active.discard(i)
+            last_was_start = False
+    return cliques
+
+
+def find_exclusion_groups(
+    windows: list[ContactWindow],
+    one_station_per_satellite: bool = True,
+) -> list[list[int]]:
+    """
+    Groups of windows of which at most one may be scheduled.
+
+    Unlike find_conflicts (which merges a whole chain of overlapping windows
+    into one group, so a single long pass blocks every window it chains to),
+    each group returned here is a clique of mutually overlapping windows, so
+    "at most one per group" is exactly "no two overlapping windows".
+
+      * station exclusivity   — one satellite at a time per ground station
+      * satellite exclusivity — one station at a time per satellite
+                                (when one_station_per_satellite is True)
+
+    A window may belong to several groups (one station group and one
+    satellite group).
+    """
+    from collections import defaultdict
+
+    by_station:   dict[str, list[int]] = defaultdict(list)
+    by_satellite: dict[str, list[int]] = defaultdict(list)
+    for i, w in enumerate(windows):
+        by_station[w.station.name].append(i)
+        by_satellite[w.satellite_id].append(i)
+
+    groups: list[list[int]] = []
+    for idx in by_station.values():
+        groups += _overlap_cliques(idx, windows)
+    if one_station_per_satellite:
+        for idx in by_satellite.values():
+            groups += _overlap_cliques(idx, windows)
+    return groups
+
+
 # ---------------------------------------------------------------------------
 # Step 2b — Composite score computation
 # ---------------------------------------------------------------------------
@@ -539,7 +604,7 @@ def greedy_schedule(
     Parameters
     ----------
     windows         : all ContactWindow objects
-    conflict_groups : output of find_conflicts
+    conflict_groups : output of find_conflicts or find_exclusion_groups
     alpha, beta, gamma : composite objective weights
 
     Returns
@@ -563,22 +628,22 @@ def greedy_schedule(
     for w, s in zip(windows, scores):
         w.composite_score = s
 
-    # Build set of conflicted indices
-    conflicted: set[int] = set()
-    for group in conflict_groups:
-        conflicted.update(group)
+    # Highest score first; accept a window unless a group it belongs to
+    # already holds an accepted window. (Groups may overlap: a window can be
+    # in a station group and a satellite group.)
+    groups_of: dict[int, list[int]] = {}
+    for g_id, group in enumerate(conflict_groups):
+        for i in group:
+            groups_of.setdefault(i, []).append(g_id)
 
+    taken_groups: set[int] = set()
     selected: set[int] = set()
-
-    # For each conflict group, pick the highest-score window
-    for group in conflict_groups:
-        best_idx = max(group, key=lambda i: scores[i])
-        selected.add(best_idx)
-
-    # Accept all non-conflicting windows
-    for i in range(len(windows)):
-        if i not in conflicted:
-            selected.add(i)
+    for i in sorted(range(len(windows)), key=lambda k: (-scores[k], k)):
+        gids = groups_of.get(i, [])
+        if any(g in taken_groups for g in gids):
+            continue
+        selected.add(i)
+        taken_groups.update(gids)
 
     scheduled = [windows[i] for i in sorted(selected)]
     dropped   = [windows[i] for i in range(len(windows)) if i not in selected]
@@ -626,6 +691,7 @@ def build_contact_schedule(
     beta:               float = 0.3,
     gamma:              float = 0.2,
     use_greedy:         bool  = False,
+    one_station_per_satellite: bool = True,
 ) -> ScheduleResult:
     """
     Full pipeline: scan → detect conflicts → solve ILP → return schedule.
@@ -646,6 +712,8 @@ def build_contact_schedule(
     beta                : relay utility weight (default 0.3)
     gamma               : data age weight (default 0.2)
     use_greedy          : if True, skip ILP and use the greedy fallback
+    one_station_per_satellite : if True (default) a satellite may be scheduled
+                          at only one ground station at a time
 
     Returns
     -------
@@ -657,7 +725,9 @@ def build_contact_schedule(
         step_s, elevation_mask_deg,
     )
 
-    conflicts = find_conflicts(windows)
+    conflicts = find_exclusion_groups(
+        windows, one_station_per_satellite=one_station_per_satellite,
+    )
 
     if use_greedy:
         result = greedy_schedule(windows, conflicts, alpha, beta, gamma)

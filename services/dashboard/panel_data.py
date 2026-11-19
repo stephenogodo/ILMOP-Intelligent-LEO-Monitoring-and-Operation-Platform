@@ -337,17 +337,27 @@ def build_panel_snapshot(
     age_by = {r.satellite_id: r.data_age_s for r in snap.dark}
     q_by   = {r.satellite_id: r.queue_mb for r in snap.dark}
 
+    # Sessions whose windows are open at the same moment must not collect the
+    # same dark satellite twice: a satellite serviced by one is removed from the
+    # candidates of the next.
+    claimed: set[str] = set()
+
     for w in chosen:
+        concurrent = w.aos_unix <= now_unix < w.los_unix
         t = max(now_unix, w.aos_unix)
         positions = {sid: eci_state(models[sid], t)[0] for sid in sat_ids}
         topo = compute_isl_topology(positions, t, orbit_classes=classes)
         sess = coordinate_relay(
-            contact_window=w, all_satellite_ids=sat_ids,
+            contact_window=w,
+            all_satellite_ids=[x for x in sat_ids
+                               if not (concurrent and x in claimed)],
             scheduled_windows=sched, isl_topology=topo,
             data_age_fn=lambda s: age_by[s],
             queue_size_fn=lambda s: q_by[s],
             dark_horizon_s=DARK_HORIZON_S, max_hops=MAX_RELAY_HOPS,
         )
+        if concurrent:
+            claimed.update(sess.dark_serviced)
         snap.relay.append(RelayRow(
             contact_satellite=w.satellite_id, station=w.station.name,
             window_start_unix=w.aos_unix,
