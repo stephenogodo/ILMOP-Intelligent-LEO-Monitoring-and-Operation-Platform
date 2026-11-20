@@ -197,3 +197,73 @@ def test_history_time_range_params_accepted(client_with_data):
         "&to=2026-08-25T01:00:00Z"
     )
     assert r.status_code == 200
+
+
+# ── Response models (OpenAPI schema) ──────────────────────────────────────────
+
+def _response_schema_ref(spec, path):
+    ok = spec["paths"][path]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+    return ok.get("$ref") or ok.get("items", {}).get("$ref")
+
+
+def test_openapi_declares_response_models(client_no_data):
+    spec = client_no_data.get("/openapi.json").json()
+    expected = {
+        "/health":                           "HealthResponse",
+        "/satellites":                       "SatelliteStatus",
+        "/telemetry/{satellite_id}/latest":  "TelemetryRecord",
+        "/telemetry/{satellite_id}":         "TelemetryRecord",
+        "/telemetry/{satellite_id}/summary": "TelemetrySummaryBucket",
+        "/alarms/{satellite_id}":            "AlarmRecord",
+    }
+    for path, model in expected.items():
+        ref = _response_schema_ref(spec, path)
+        assert ref is not None and ref.endswith("/" + model), path
+
+
+def test_satellites_full_row_keeps_all_fields(client_no_data):
+    row = {
+        "satellite_id": "SAT-001",
+        "last_seen": datetime(2026, 8, 25, 12, 0, 0, tzinfo=timezone.utc),
+        "battery_pct": 90.0, "temperature_c": 20.0, "altitude_km": 550.0,
+        "in_eclipse": False, "in_contact": True,
+        "safe_mode": False, "anomaly_flag": False,
+    }
+    app.state.pool.fetch = AsyncMock(return_value=[row])
+    body = client_no_data.get("/satellites").json()
+    assert body[0]["battery_pct"] == 90.0
+    assert body[0]["in_contact"] is True
+    assert body[0]["last_seen"].startswith("2026-08-25T12:00:00")
+
+
+def test_alarms_row_passes_through(client_no_data):
+    row = {
+        "satellite_id": "SAT-001",
+        "timestamp": datetime(2026, 8, 25, 12, 0, 0, tzinfo=timezone.utc),
+        "orbit_type": "LEO_CIRCULAR", "severity": "WARNING",
+        "alarm_type": "BATTERY", "parameter": "battery_pct",
+        "observed_value": 12.0, "expected_min": 40.0, "expected_max": 100.0,
+        "anomaly_score": -0.2, "model_version": "v7", "message": "low",
+        "from_fault_injection": False,
+    }
+    app.state.pool.fetch = AsyncMock(return_value=[row])
+    body = client_no_data.get("/alarms/SAT-001").json()
+    assert body[0]["severity"] == "WARNING"
+    assert body[0]["observed_value"] == 12.0
+    assert isinstance(body[0]["timestamp"], str)
+
+
+def test_summary_row_renames_time_to_timestamp(client_no_data):
+    row = {
+        "time": datetime(2026, 8, 25, 12, 0, 0, tzinfo=timezone.utc),
+        "satellite_id": "SAT-001",
+        "avg_battery_pct": 91.0, "avg_battery_voltage_v": 28.0,
+        "avg_solar_power_w": 1200.0, "avg_temperature_c": 19.0,
+        "avg_cpu_pct": 30.0, "avg_memory_pct": 40.0, "avg_altitude_km": 550.0,
+        "any_eclipse": False, "any_contact": False, "sample_count": 10,
+    }
+    app.state.pool.fetch = AsyncMock(return_value=[row])
+    body = client_no_data.get("/telemetry/SAT-001/summary").json()
+    assert body[0]["timestamp"].startswith("2026-08-25T12:00:00")
+    assert body[0]["sample_count"] == 10
+    assert "time" not in body[0]

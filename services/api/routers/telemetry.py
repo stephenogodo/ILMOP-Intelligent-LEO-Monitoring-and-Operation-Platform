@@ -11,13 +11,14 @@ GET /telemetry/{satellite_id}/summary    — 5-minute aggregated buckets
 import json
 import logging
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import List, Optional
 
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from services.api.db import get_pool
 from services.api.cache import get_cache, cache_get, cache_set
+from services.api.models import TelemetryRecord, TelemetrySummaryBucket
 
 log    = logging.getLogger(__name__)
 router = APIRouter(prefix="/telemetry", tags=["telemetry"])
@@ -44,6 +45,7 @@ def _record_to_dict(row: asyncpg.Record) -> dict:
 @router.get(
     "/{satellite_id}/latest",
     summary="Latest telemetry record for a satellite",
+    response_model=TelemetryRecord,
 )
 async def get_latest(
     satellite_id: str,
@@ -95,6 +97,7 @@ async def get_latest(
 @router.get(
     "/{satellite_id}",
     summary="Telemetry history for a satellite",
+    response_model=List[TelemetryRecord],
 )
 async def get_history(
     satellite_id: str,
@@ -153,6 +156,7 @@ async def get_history(
 @router.get(
     "/{satellite_id}/summary",
     summary="5-minute aggregated telemetry summary",
+    response_model=List[TelemetrySummaryBucket],
 )
 async def get_summary(
     satellite_id: str,

@@ -1,12 +1,13 @@
 """GET /alarms/{satellite_id} — recent alarms from the anomaly detection service."""
 
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from asyncpg import Pool
 
 from services.api.db import get_pool
+from services.api.models import AlarmRecord
 
 router = APIRouter(prefix="/alarms", tags=["alarms"])
 
@@ -14,6 +15,7 @@ router = APIRouter(prefix="/alarms", tags=["alarms"])
 @router.get(
     "/{satellite_id}",
     summary="Recent anomaly alarms for a satellite",
+    response_model=List[AlarmRecord],
 )
 async def get_alarms(
     satellite_id: str,

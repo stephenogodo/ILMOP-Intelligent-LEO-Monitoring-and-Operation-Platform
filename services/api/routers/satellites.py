@@ -2,12 +2,19 @@
 
 from fastapi import APIRouter, Depends
 from asyncpg import Pool
+from typing import List
+
 from services.api.db import get_pool
+from services.api.models import SatelliteStatus
 
 router = APIRouter(prefix="/satellites", tags=["satellites"])
 
 
-@router.get("", summary="List all satellites with recent telemetry")
+@router.get(
+    "",
+    summary="List all satellites with recent telemetry",
+    response_model=List[SatelliteStatus],
+)
 async def list_satellites(pool: Pool = Depends(get_pool)):
     """
     Returns a list of satellites that have submitted telemetry in the

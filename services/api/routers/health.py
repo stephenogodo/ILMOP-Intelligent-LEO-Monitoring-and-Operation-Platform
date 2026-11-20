@@ -4,11 +4,12 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 from asyncpg import Pool
 from services.api.db import get_pool
+from services.api.models import HealthResponse
 
 router = APIRouter(tags=["health"])
 
 
-@router.get("/health", summary="API liveness check")
+@router.get("/health", summary="API liveness check", response_model=HealthResponse)
 async def health(pool: Pool = Depends(get_pool)):
     """
     Returns the API status and a UTC timestamp.
