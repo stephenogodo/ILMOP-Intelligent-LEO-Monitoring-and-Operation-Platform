@@ -73,3 +73,6 @@ score_test.py
 # ── Private / unpublished research documents ──────────────────────────────────
 docs/private/
 docs/word/
+*.patch
+status.txt
+*.bak
