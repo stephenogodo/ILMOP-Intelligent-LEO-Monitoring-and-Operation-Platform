@@ -97,6 +97,7 @@ class EnrichedPropagator:
         n, T = len(self.satellite_ids), self._n_steps
 
         self._states: list[dict[str, SatelliteState]] = []
+        self.adjacency: list[dict] = []     # ISL adjacency per grid step
         visible = np.zeros((n, T), dtype=bool)
         self.relay_value = np.zeros((n, T))
         self.data_age    = np.zeros((n, T))
@@ -128,6 +129,8 @@ class EnrichedPropagator:
                 adj[link.sat_a].add(link.sat_b)
                 adj[link.sat_b].add(link.sat_a)
 
+            self.adjacency.append(dict(adj))
+
             for s in self.satellite_ids:
                 i = idx[s]
                 if visible[i, k]:
@@ -151,6 +154,10 @@ class EnrichedPropagator:
     def _k(self, unix: float) -> int:
         k = int(round((unix - self.t0) / self.step_s))
         return min(max(k, 0), self._n_steps - 1)
+
+    def adjacency_at(self, unix: float) -> dict:
+        """ISL adjacency {sat_id: {neighbour ids}} at the nearest grid step."""
+        return self.adjacency[self._k(unix)]
 
     def __call__(self, sat_id: str, unix: float) -> SatelliteState:
         k = self._k(unix)

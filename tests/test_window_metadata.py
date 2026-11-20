@@ -171,3 +171,12 @@ def test_pipeline_default_is_duration_weighted_and_low_level_default_is_not():
         .parameters['duration_weighted'].default is True
     assert inspect.signature(solve_schedule) \
         .parameters['duration_weighted'].default is False
+
+
+def test_adjacency_lookup_matches_the_grid(enriched):
+    ids, _, prop = enriched
+    adj = prop.adjacency_at(NOW + 600)
+    assert adj is prop.adjacency[prop._k(NOW + 600)]
+    for a, nbrs in adj.items():
+        for b in nbrs:
+            assert a in adj[b]               # links are symmetric
