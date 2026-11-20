@@ -50,6 +50,7 @@ from services.scheduler.handover import (
     get_active_station,
 )
 from services.scheduler.isl_visibility import ISLTopology, compute_isl_topology
+from services.scheduler.window_metadata import EnrichedPropagator
 from services.scheduler.relay_coordinator import (
     MAX_RELAY_HOPS,
     RelaySession,
@@ -265,8 +266,14 @@ def build_panel_context(
     models, classes = build_orbit_models(scenario_cfg, slots)
     sat_ids  = [s[0] for s in slots]
     stations = make_stations(ground_stations)
-    prop     = make_propagator(models)
     h1 = horizon_start + horizon_h * 3600.0
+    # Geometry propagator wrapped so each window carries relay_value and
+    # data_age_s (the beta and gamma terms of the composite objective).
+    prop = EnrichedPropagator(
+        sat_ids, stations, make_propagator(models), horizon_start, h1,
+        step_s=step_s, elevation_mask_deg=elevation_mask_deg,
+        orbit_classes=classes,
+    )
 
     status = 'Greedy' if use_greedy else None
     try:

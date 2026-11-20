@@ -72,8 +72,9 @@ class SatelliteState:
     satellite_id:      str
     eci_position_km:   np.ndarray    # shape (3,)
     eci_velocity_km_s: np.ndarray    # shape (3,)
-    relay_value:       float = 0.0   # 0–1: ISL relay utility (0 = has direct link)
-    data_age_s:        float = 0.0   # seconds since last ground contact
+    relay_value:       float = 0.0   # 0–1: share of the other satellites that are dark
+                                     # but reachable by ISL (see window_metadata.py)
+    data_age_s:        float = 0.0   # seconds since last in view of a station
 
 
 @dataclass
@@ -388,6 +389,7 @@ def _compute_composite_scores(
     alpha:   float,
     beta:    float,
     gamma:   float,
+    duration_weighted: bool = False,
 ) -> list[float]:
     """
     Compute a normalised composite score for each window.
@@ -401,6 +403,17 @@ def _compute_composite_scores(
 
     relay_value is already expected to be in [0, 1] (set by the ISL
     relay coordinator or defaulting to 0).
+
+    With duration_weighted=True the score is a value *rate* multiplied by the
+    contact time, so that relay and freshness benefits accrue per second of
+    contact instead of per window:
+
+    score(w) = (duration(w) / max duration)
+               × (α + β × relay_value(w) + γ × data_age_norm(w))
+
+    The additive form above gives every window a positive score regardless of
+    its length, so the ILP then maximises the *number* of windows and the
+    relay and freshness weights barely change the schedule.
 
     If the total weight α + β + γ = 0, equal weights (1/3 each) are used.
 
@@ -443,10 +456,18 @@ def _compute_composite_scores(
     # window would be arbitrarily dropped by the solver (indifferent to
     # including or excluding it), which is never the desired behaviour.
     _EPS = 1e-6
-    scores = [
-        max(_EPS, alpha * d + beta * r + gamma * a)
-        for d, r, a in zip(dur_norm, rel_norm, age_norm)
-    ]
+    if duration_weighted:
+        d_max = max(durations)
+        share = [d / d_max if d_max > 0 else 1.0 for d in durations]
+        scores = [
+            max(_EPS, sh * (alpha + beta * r + gamma * a))
+            for sh, r, a in zip(share, rel_norm, age_norm)
+        ]
+    else:
+        scores = [
+            max(_EPS, alpha * d + beta * r + gamma * a)
+            for d, r, a in zip(dur_norm, rel_norm, age_norm)
+        ]
 
     return scores
 
@@ -461,6 +482,7 @@ def solve_schedule(
     alpha:           float = 0.5,
     beta:            float = 0.3,
     gamma:           float = 0.2,
+    duration_weighted: bool = False,
 ) -> ScheduleResult:
     """
     Solve the contact window scheduling ILP with a composite objective.
@@ -517,7 +539,8 @@ def solve_schedule(
         )
 
     # ── Normalise and store composite scores ─────────────────────────────────
-    scores = _compute_composite_scores(windows, alpha, beta, gamma)
+    scores = _compute_composite_scores(windows, alpha, beta, gamma,
+                                       duration_weighted)
     for w, s in zip(windows, scores):
         w.composite_score = s
 
@@ -592,6 +615,7 @@ def greedy_schedule(
     alpha:           float = 0.5,
     beta:            float = 0.3,
     gamma:           float = 0.2,
+    duration_weighted: bool = False,
 ) -> ScheduleResult:
     """
     Greedy fallback scheduler — same composite score, no ILP.
@@ -624,7 +648,8 @@ def greedy_schedule(
             weights_used       = (alpha, beta, gamma),
         )
 
-    scores = _compute_composite_scores(windows, alpha, beta, gamma)
+    scores = _compute_composite_scores(windows, alpha, beta, gamma,
+                                       duration_weighted)
     for w, s in zip(windows, scores):
         w.composite_score = s
 
@@ -692,6 +717,7 @@ def build_contact_schedule(
     gamma:              float = 0.2,
     use_greedy:         bool  = False,
     one_station_per_satellite: bool = True,
+    duration_weighted:  bool  = True,
 ) -> ScheduleResult:
     """
     Full pipeline: scan → detect conflicts → solve ILP → return schedule.
@@ -714,6 +740,8 @@ def build_contact_schedule(
     use_greedy          : if True, skip ILP and use the greedy fallback
     one_station_per_satellite : if True (default) a satellite may be scheduled
                           at only one ground station at a time
+    duration_weighted   : if True (default) window score = contact-time share ×
+                          (α + β·relay + γ·age); False gives the additive score
 
     Returns
     -------
@@ -730,8 +758,10 @@ def build_contact_schedule(
     )
 
     if use_greedy:
-        result = greedy_schedule(windows, conflicts, alpha, beta, gamma)
+        result = greedy_schedule(windows, conflicts, alpha, beta, gamma,
+                                 duration_weighted)
     else:
-        result = solve_schedule(windows, conflicts, alpha, beta, gamma)
+        result = solve_schedule(windows, conflicts, alpha, beta, gamma,
+                                duration_weighted)
 
     return result
