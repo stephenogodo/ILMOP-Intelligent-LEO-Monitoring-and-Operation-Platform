@@ -272,6 +272,7 @@ python run_demo.py --scenario 3 --speed 60  # 24 satellites, 4 planes
 | ADR-018 | Python for OTFS waveform implementation |
 | ADR-019 | Azure AKS as cloud deployment platform *(Sprint 9, planned)* |
 | ADR-020 | ILP ground station scheduler *(Sprint 7, complete)* |
+| ADR-021 | Command path: approval chain, effectively-once delivery and authentication *(Sprint 8, accepted)* |
 
 ---
 

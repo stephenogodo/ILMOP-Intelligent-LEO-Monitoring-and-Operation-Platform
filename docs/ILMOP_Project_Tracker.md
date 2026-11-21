@@ -245,10 +245,11 @@ with Svalbard and Fairbanks among its stations). See ADR-020.
 | ADR-016 | LEO/HEO training separation | 5 | ✅ Accepted |
 | ADR-017 | HPOP navigation truth model (J2–J6) | 6 | ✅ Accepted |
 | ADR-018 | Python for OTFS waveform implementation | 5 | ✅ Accepted |
-| ADR-019 | Azure as cloud deployment platform | 7 | Planned |
-| ADR-020 | ILP ground station scheduler | 7 | Planned |
+| ADR-019 | Azure as cloud deployment platform | 9 | Planned |
+| ADR-020 | ILP ground station scheduler | 7 | ✅ Accepted |
+| ADR-021 | Command path: approval chain, effectively-once delivery, authentication | 8 | ✅ Accepted |
 
-All ADRs 001–018 include academic citations.
+All ADRs 001–018 and ADR-021 include academic citations.
 
 ---
 
