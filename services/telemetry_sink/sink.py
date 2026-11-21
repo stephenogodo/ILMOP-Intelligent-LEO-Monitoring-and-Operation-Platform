@@ -18,7 +18,6 @@ Design decisions
   is logged and skipped; it never reaches the database.
 """
 
-import json
 import logging
 import time
 from datetime import datetime, timezone
@@ -26,10 +25,10 @@ from datetime import datetime, timezone
 import psycopg2
 import psycopg2.extras
 from confluent_kafka import Consumer, KafkaError, KafkaException
-from pydantic import ValidationError
 
+from services.messaging.codec import MessageDecodeError
+from services.messaging.project_codecs import decode_telemetry
 from shared.config import settings
-from shared.schemas.telemetry_schema import Telemetry
 
 logging.basicConfig(
     level=logging.INFO,
@@ -149,14 +148,10 @@ class TelemetrySink:
     def _parse(self, msg) -> dict | None:
         """Decode and validate one Kafka message. Returns None on failure."""
         try:
-            raw      = json.loads(msg.value().decode("utf-8"))
-            tel      = Telemetry(**raw)
-        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            # Accepts both JSON and Avro messages (detected automatically).
+            tel = decode_telemetry(msg.value())
+        except MessageDecodeError as exc:
             log.error("Decode error | offset=%d error=%s", msg.offset(), exc)
-            return None
-        except ValidationError as exc:
-            log.error("Schema error | offset=%d errors=%s",
-                      msg.offset(), exc.errors())
             return None
 
         return {

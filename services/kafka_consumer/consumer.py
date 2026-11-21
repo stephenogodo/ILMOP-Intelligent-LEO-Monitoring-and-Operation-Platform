@@ -13,14 +13,13 @@ For production sinks (TimescaleDB, anomaly detection) see the dedicated
 services under services/telemetry_sink/ and services/anomaly_detection/.
 """
 
-import json
 import logging
 
 from confluent_kafka import Consumer, KafkaError, KafkaException
-from pydantic import ValidationError
 
+from services.messaging.codec import MessageDecodeError
+from services.messaging.project_codecs import decode_telemetry
 from shared.config import settings
-from shared.schemas.telemetry_schema import Telemetry
 
 logging.basicConfig(
     level=logging.INFO,
@@ -80,15 +79,11 @@ class TelemetryConsumer:
     def _handle(self, msg):
         """Decode, validate, and log one Kafka message."""
         try:
-            raw      = json.loads(msg.value().decode("utf-8"))
-            telemetry = Telemetry(**raw)
-        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            # Accepts both JSON and Avro messages (detected automatically).
+            telemetry = decode_telemetry(msg.value())
+        except MessageDecodeError as exc:
             log.error("Failed to decode message | offset=%d error=%s",
                       msg.offset(), exc)
-            return
-        except ValidationError as exc:
-            log.error("Schema validation failed | offset=%d errors=%s",
-                      msg.offset(), exc.errors())
             return
 
         log.info(

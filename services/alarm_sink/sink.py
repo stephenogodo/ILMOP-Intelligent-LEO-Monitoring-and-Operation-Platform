@@ -18,14 +18,13 @@ Run alongside the anomaly detection service:
     Terminal 2: python -m services.alarm_sink.sink
 """
 
-import json
 import logging
 import psycopg2
 import psycopg2.extras
 from confluent_kafka import Consumer, KafkaException
 
+from services.messaging.project_codecs import decode_alarm
 from shared.config import settings
-from shared.schemas.alarm_schema import Alarm
 
 logging.basicConfig(
     level=logging.INFO,
@@ -86,8 +85,8 @@ class AlarmSink:
     def _parse(self, msg) -> dict | None:
         """Deserialise and validate one Kafka alarm message."""
         try:
-            data  = json.loads(msg.value().decode("utf-8"))
-            alarm = Alarm(**data)
+            # Accepts both JSON and Avro messages (detected automatically).
+            alarm = decode_alarm(msg.value())
             return {
                 "timestamp":           alarm.timestamp,
                 "satellite_id":        alarm.satellite_id,

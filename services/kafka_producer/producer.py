@@ -10,13 +10,13 @@ records for a given satellite land in the same partition and are processed
 in order by any consumer of that partition.
 """
 
-import json
 import logging
 import time
 
 from confluent_kafka import Producer, KafkaException
 
 from shared.config import settings
+from services.messaging.project_codecs import encode_telemetry
 from services.satellite_simulator.telemetry import TelemetryGenerator
 
 logging.basicConfig(
@@ -65,9 +65,8 @@ class TelemetryProducer:
         try:
             while True:
                 telemetry = self._generator.generate()
-                payload   = json.dumps(
-                    telemetry.model_dump(mode="json")
-                ).encode("utf-8")
+                # JSON by default; Avro when KAFKA_SERIALIZATION=avro.
+                payload   = encode_telemetry(telemetry)
 
                 self._producer.produce(
                     topic    = self._topic,

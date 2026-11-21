@@ -16,7 +16,6 @@ Usage (after training a model):
     python -m services.anomaly_detection.detector
 """
 
-import json
 import logging
 import os
 from datetime import datetime, timezone
@@ -28,6 +27,7 @@ import numpy as np
 from confluent_kafka import Consumer, Producer
 
 from services.anomaly_detection.features import extract_features
+from services.messaging.project_codecs import decode_telemetry, encode_alarm
 from shared.config import settings
 from shared.schemas.alarm_schema import Alarm
 from shared.schemas.telemetry_schema import Telemetry
@@ -224,8 +224,8 @@ class AnomalyDetectionService:
 
     def _parse(self, raw_bytes: bytes) -> Optional[Telemetry]:
         try:
-            data = json.loads(raw_bytes.decode("utf-8"))
-            return Telemetry(**data)
+            # Accepts both JSON and Avro messages (detected automatically).
+            return decode_telemetry(raw_bytes)
         except Exception as e:
             log.warning("Failed to parse telemetry record: %s", e)
             return None
@@ -251,7 +251,8 @@ class AnomalyDetectionService:
 
     def _publish_alarm(self, alarm: Alarm):
         topic   = settings.alarms_topic(alarm.satellite_id)
-        payload = json.dumps(alarm.model_dump(mode="json")).encode("utf-8")
+        # JSON by default; Avro when KAFKA_SERIALIZATION=avro.
+        payload = encode_alarm(alarm)
         self._producer.produce(
             topic = topic,
             key   = alarm.satellite_id.encode("utf-8"),

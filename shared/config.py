@@ -16,6 +16,8 @@ Usage
     conn     = await asyncpg.connect(settings.timescaledb_url)
 """
 
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -42,6 +44,11 @@ class Settings(BaseSettings):
     kafka_consumer_group_sink: str = "ilmop-sink"
     kafka_consumer_group_anomaly: str = "ilmop-anomaly-detection"
     kafka_consumer_group_dashboard: str = "ilmop-dashboard"
+
+    # Format the PRODUCERS write.  Consumers always read both, so upgrade
+    # every consumer first and only then set this to "avro" (ADR-022).
+    # An invalid value stops the service at start-up.
+    kafka_serialization: Literal["json", "avro"] = "json"
 
     # ── TimescaleDB ───────────────────────────────────────────────────────────
     timescaledb_host: str = "localhost"
