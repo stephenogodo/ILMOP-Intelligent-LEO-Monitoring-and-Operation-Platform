@@ -34,8 +34,8 @@ and 8.87 m (Lagos, 6.5°N) against a J2–J6 high-precision orbital truth
 reference. The waveform layer carries 129/129 passing tests; combined platform
 and waveform tests total **410/410 with zero warnings** through Sprint 6.
 
-**Sprint 7 adds 105 new tests** (Layers 1–5 complete) for a running total of
-**515 passing tests** across the platform.
+**Sprint 7 is complete.** The full suite stands at **674 passing tests**
+(1 skipped) across the platform.
 
 ## Why this project exists
 
@@ -199,7 +199,7 @@ within the range limit for their orbit-class pair.
 | Cache | Redis | 7-alpine | — |
 | ML / tracking | scikit-learn + MLflow | 1.9 / 3.16 | ADR-014/015 |
 | ILP scheduler | PuLP 2.9.0 (CBC) | Sprint 7 | ADR-020 |
-| Cloud | Azure AKS + Event Hubs | Sprint 8 | ADR-019 |
+| Cloud | Azure AKS + Event Hubs | Sprint 9 | ADR-019 |
 | Testing | pytest | 9.1+ | — |
 
 ---
@@ -230,7 +230,7 @@ pip install -r requirements.txt
 
 ```bash
 python -m pytest tests/ -v
-# Expected: 515 passed (Sprint 7 Layers 1–5 + Sprint 1–6)
+# Expected: 674 passed, 1 skipped (Sprints 1–7)
 ```
 
 ### 3. Start infrastructure
@@ -270,7 +270,7 @@ python run_demo.py --scenario 3 --speed 60  # 24 satellites, 4 planes
 | ADR-016 | LEO/HEO training data separation |
 | ADR-017 | J2+J3+J4+J5+J6 HPOP as navigation truth reference |
 | ADR-018 | Python for OTFS waveform implementation |
-| ADR-019 | Azure AKS as cloud deployment platform *(Sprint 8, planned)* |
+| ADR-019 | Azure AKS as cloud deployment platform *(Sprint 9, planned)* |
 | ADR-020 | ILP ground station scheduler *(Sprint 7, complete)* |
 
 ---

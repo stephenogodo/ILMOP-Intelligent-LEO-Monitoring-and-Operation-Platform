@@ -135,7 +135,7 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 | S7-13 | As an operator, I need a relay coordinator so that satellites with no direct ground contact can route data through relay satellites using the ISL topology. | 6 | 13 | ✅ Done (24 tests) |
 | S7-17 | As an operator, I need a contact scheduler runtime engine so that the static ILP schedule is turned into live AOS/LOS Kafka events (`contact.<sat_id>.aos/los/schedule`) with handover state and dark-satellite flags. | 3 | 8 | ✅ Done (17 tests) |
 
-### Pending stories
+### Dashboard, scenario and merged stories (all complete)
 
 | ID | User story | Layer | SP | Status |
 |----|-----------|-------|----|--------|
