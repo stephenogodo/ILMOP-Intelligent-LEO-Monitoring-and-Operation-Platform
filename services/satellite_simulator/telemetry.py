@@ -20,6 +20,7 @@ from services.satellite_simulator.satellite import Satellite
 from services.satellite_simulator.orbit import OrbitModel
 from services.satellite_simulator.battery import BatteryModel
 from services.satellite_simulator.thermal import ThermalModel
+from services.satellite_simulator.command_receiver import CommandReceiver
 
 # ── State persistence ─────────────────────────────────────────────────────────
 # Battery and thermal state are saved on shutdown and restored on startup so
@@ -121,6 +122,11 @@ class _ContactModel:
         self.in_contact = False
         self._timer_s   = random.uniform(self.GAP_S_MIN, self.GAP_S_MAX)
 
+        # Adjustable copy of the downlink mean.  The uplink receiver changes
+        # this when a SET_DOWNLINK_RATE command is executed.  The default is
+        # the class constant, so behaviour is unchanged until a command runs.
+        self.downlink_mean_mbps = self.DOWNLINK_MEAN_MBPS
+
     def update(self, dt_s: float = 1.0):
         self._timer_s -= dt_s
         if self._timer_s <= 0:
@@ -131,7 +137,7 @@ class _ContactModel:
                 self._timer_s = random.uniform(self.GAP_S_MIN, self.GAP_S_MAX)
 
         if self.in_contact:
-            dl = max(0.0, random.gauss(self.DOWNLINK_MEAN_MBPS, self.DOWNLINK_STD_MBPS))
+            dl = max(0.0, random.gauss(self.downlink_mean_mbps, self.DOWNLINK_STD_MBPS))
             ul = max(0.0, random.gauss(self.UPLINK_MEAN_MBPS,   self.UPLINK_STD_MBPS))
             return True, dl, ul
 
@@ -257,6 +263,10 @@ class TelemetryGenerator:
         self._compute = _ComputeModel()
         self._contact = _ContactModel()
         self._fault   = _FaultInjector(fault_type=fault_type)
+
+        # Uplink receiver (Sprint 8, S8-06).  It acts on the same Satellite
+        # object and contact model that this generator updates each tick.
+        self.command_receiver = CommandReceiver(self.satellite, self._contact)
 
         # Simulated time cursor — advances at time_multiplier × wall-clock rate
         self._sim_time = datetime.now(timezone.utc)

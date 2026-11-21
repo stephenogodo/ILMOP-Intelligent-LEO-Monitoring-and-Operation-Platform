@@ -130,3 +130,26 @@ class Command(BaseModel):
     # Audit trail, oldest first.  Never empty: the first entry is the
     # creation as DRAFT.
     history: List[StatusChange]
+
+
+class CommandAck(BaseModel):
+    """
+    The satellite's answer to a command it received (Sprint 8, S8-06).
+
+    Both sides use this: the simulated satellite produces it, and the
+    ground-side bridge reads it to decide whether to confirm the command.
+
+    accepted:  the satellite took the command in.  False means it was
+               turned away (see reason), and nothing was executed.
+    executed:  True only the FIRST time the command ran.  A repeat of an
+               already-executed command is accepted but not executed again.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    command_id:   str
+    satellite_id: str
+    accepted:     bool
+    executed:     bool
+    reason:       str
+    timestamp:    datetime
