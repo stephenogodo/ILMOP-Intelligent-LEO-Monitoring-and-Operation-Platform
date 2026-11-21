@@ -1,0 +1,85 @@
+{
+  "type": "record",
+  "name": "Alarm",
+  "namespace": "ilmop.alarm",
+  "fields": [
+    {
+      "name": "satellite_id",
+      "type": "string"
+    },
+    {
+      "name": "timestamp",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      }
+    },
+    {
+      "name": "orbit_type",
+      "type": {
+        "type": "enum",
+        "name": "OrbitType",
+        "symbols": [
+          "LEO_CIRCULAR",
+          "HEO_MOLNIYA"
+        ]
+      },
+      "default": "LEO_CIRCULAR"
+    },
+    {
+      "name": "severity",
+      "type": {
+        "type": "enum",
+        "name": "Severity",
+        "symbols": [
+          "INFO",
+          "WARNING",
+          "CRITICAL"
+        ]
+      }
+    },
+    {
+      "name": "alarm_type",
+      "type": "string"
+    },
+    {
+      "name": "parameter",
+      "type": "string"
+    },
+    {
+      "name": "observed_value",
+      "type": "double"
+    },
+    {
+      "name": "expected_min",
+      "type": "double"
+    },
+    {
+      "name": "expected_max",
+      "type": "double"
+    },
+    {
+      "name": "anomaly_score",
+      "type": "double"
+    },
+    {
+      "name": "model_version",
+      "type": "string"
+    },
+    {
+      "name": "message",
+      "type": "string"
+    },
+    {
+      "name": "from_fault_injection",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "name": "schema_version",
+      "type": "string",
+      "default": "1.0"
+    }
+  ],
+  "doc": "Anomaly alarm. Generated from shared/schemas/alarm_schema.py."
+}

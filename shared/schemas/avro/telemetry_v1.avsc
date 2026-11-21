@@ -1,0 +1,86 @@
+{
+  "type": "record",
+  "name": "Telemetry",
+  "namespace": "ilmop.telemetry",
+  "fields": [
+    {
+      "name": "satellite_id",
+      "type": "string"
+    },
+    {
+      "name": "timestamp",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-micros"
+      }
+    },
+    {
+      "name": "latitude_deg",
+      "type": "double"
+    },
+    {
+      "name": "longitude_deg",
+      "type": "double"
+    },
+    {
+      "name": "altitude_km",
+      "type": "double"
+    },
+    {
+      "name": "in_eclipse",
+      "type": "boolean"
+    },
+    {
+      "name": "in_contact",
+      "type": "boolean"
+    },
+    {
+      "name": "battery_pct",
+      "type": "double"
+    },
+    {
+      "name": "battery_voltage_v",
+      "type": "double"
+    },
+    {
+      "name": "solar_panel_power_w",
+      "type": "double"
+    },
+    {
+      "name": "temperature_c",
+      "type": "double"
+    },
+    {
+      "name": "cpu_utilization_pct",
+      "type": "double"
+    },
+    {
+      "name": "memory_utilization_pct",
+      "type": "double"
+    },
+    {
+      "name": "downlink_rate_mbps",
+      "type": "double"
+    },
+    {
+      "name": "uplink_rate_mbps",
+      "type": "double"
+    },
+    {
+      "name": "safe_mode",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "name": "anomaly_flag",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "name": "fault_injected",
+      "type": "boolean",
+      "default": false
+    }
+  ],
+  "doc": "Satellite telemetry snapshot, version 2.0 (before orbit_type was added, see ADR-016). Historic fixture: do not regenerate."
+}
