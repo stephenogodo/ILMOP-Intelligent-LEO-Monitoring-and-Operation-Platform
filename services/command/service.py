@@ -155,6 +155,27 @@ class CommandService:
             )
         return updated
 
+    def reject(
+        self,
+        command_id: str,
+        operator: Actor,
+        reason: str,
+        now: Optional[datetime] = None,
+    ) -> Command:
+        """
+        Reject a stored DRAFT (human operators only, a reason is required).
+
+        Uses compare-and-swap like approve(), so a command that was approved
+        a moment earlier cannot also be rejected.
+        """
+        command = self._require(command_id)
+        updated = lifecycle.reject(command, operator, reason, now)
+        if not self._store.compare_and_save(updated, CommandStatus.DRAFT):
+            raise lifecycle.InvalidTransitionError(
+                f"command {command_id} is no longer DRAFT"
+            )
+        return updated
+
     # ── Step 3: dispatch (the at-most-once guard) ─────────────────────────────
 
     def dispatch(

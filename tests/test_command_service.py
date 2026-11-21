@@ -214,3 +214,27 @@ class TestConfirm:
         cid = _approved(service)
         with pytest.raises(InvalidTransitionError):
             service.confirm(cid, UPLINK)
+
+
+# ── Rejection through the service (added with S8-08) ──────────────────────────
+
+class TestReject:
+
+    def test_reject_updates_the_stored_command(self):
+        service = CommandService()
+        r = service.submit("SAT-001", "SET_SAFE_MODE", {"enabled": True}, OPERATOR)
+        rejected = service.reject(r.command.command_id, OPERATOR, "wrong satellite")
+        assert rejected.status is CommandStatus.REJECTED
+        assert service.get(r.command.command_id).status is CommandStatus.REJECTED
+
+    def test_an_approved_command_cannot_then_be_rejected(self):
+        service = CommandService()
+        cid = _approved(service)
+        with pytest.raises(InvalidTransitionError):
+            service.reject(cid, OPERATOR, "too late")
+
+    def test_system_actor_cannot_reject(self):
+        service = CommandService()
+        r = service.submit("SAT-001", "SET_SAFE_MODE", {"enabled": True}, OPERATOR)
+        with pytest.raises(ApprovalError):
+            service.reject(r.command.command_id, UPLINK, "no")
