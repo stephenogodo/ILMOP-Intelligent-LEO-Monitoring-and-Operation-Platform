@@ -145,7 +145,7 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 
 ---
 
-## Sprint 8 — MOS Completeness (complete)
+## Sprint 8 — Command Path, CCSDS Receive Chain and Telemetry Schema Contract (complete)
 
 **Version:** v0.8.0-beta  
 **Status:** ✅ Complete (60 of 60 SP)  

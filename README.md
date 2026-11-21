@@ -144,8 +144,8 @@ random-walk telemetry learns nothing operationally meaningful.
 | 4 | v0.4.0-beta | Telemetry Data Platform — API and Dashboard | ✅ Complete | 75/75 |
 | 5 | v0.5.0-beta | Intelligent Digital Twin — AI/ML | ✅ Complete | 152/152 |
 | 6 | v0.6.0-beta | Demonstration Layer — OTFS, HPOP, Fleet Dashboard | ✅ Complete | 281/281 |
-| 7 | v1.0.0 | LEO Constellation Operations Suite | ✅ Complete | 674 passed, 1 skipped |
-| **8** | **v0.8.0-beta** | **MOS Completeness — command path, CCSDS receive chain, Avro schema registry** | **✅ Complete** | **1110 passed, 4 skipped** |
+| 7 | v0.7.0-beta | LEO Constellation Operations Suite | ✅ Complete | 674 passed, 1 skipped |
+| **8** | **v0.8.0-beta** | **Command Path, CCSDS Receive Chain and Telemetry Schema Contract** | **✅ Complete** | **1110 passed, 4 skipped** |
 
 Full sprint scope, risk register, ADR register, and session log:
 [`docs/ILMOP_Project_Tracker.md`](docs/ILMOP_Project_Tracker.md)

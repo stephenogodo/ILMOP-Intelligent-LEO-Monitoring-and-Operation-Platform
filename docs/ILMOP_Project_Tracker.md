@@ -18,8 +18,8 @@
 | 4 | v0.4.0-beta | Telemetry Data Platform (FastAPI, Streamlit, Redis) | ✅ Complete | 75/75 |
 | 5 | v0.5.0-beta | Intelligent Digital Twin (AI/ML anomaly detection) | ✅ Complete | 152/152 |
 | 6 | v0.6.0-beta | Demonstration Layer (OTFS waveform, navigation, fleet dashboard) | ✅ Complete | 281/281 |
-| 7 | v1.0.0 | LEO Constellation Operations Suite | ✅ Complete | 674 passed, 1 skipped |
-| 8 | v0.8.0-beta | MOS Completeness (command path, CCSDS receive chain, Avro schema registry) | ✅ Complete | 1110 passed, 4 skipped |
+| 7 | v0.7.0-beta | LEO Constellation Operations Suite | ✅ Complete | 674 passed, 1 skipped |
+| 8 | v0.8.0-beta | Command Path, CCSDS Receive Chain and Telemetry Schema Contract | ✅ Complete | 1110 passed, 4 skipped |
 
 ---
 
@@ -204,7 +204,7 @@ with Svalbard and Fairbanks among its stations). See ADR-020.
 
 ---
 
-## Sprint 8 — MOS Completeness (Complete)
+## Sprint 8 — Command Path, CCSDS Receive Chain and Telemetry Schema Contract (Complete)
 
 Closes the gaps against the LEO MOS architecture study guide: a controlled command path, a realistic receive chain and a shared serialisation contract. 60 of 60 story points delivered.
 
