@@ -2,9 +2,9 @@
 
 **Project:** Intelligent LEO Monitoring and Operation Platform
 **GitHub:** github.com/stephenogodo/ILMOP-Intelligent-LEO-Monitoring-and-Operation-Platform
-**Current version:** v0.7.0-beta (Sprint 7 complete)
-**Last updated:** October 2026
-**Total tests passing:** 535/535 (1 skipped)
+**Current version:** v0.8.0-beta (Sprint 8 complete)
+**Last updated:** November 2026
+**Total tests passing:** 1110 passed, 4 skipped (3 of the skips need the optional `fastavro` package)
 
 ---
 
@@ -19,6 +19,7 @@
 | 5 | v0.5.0-beta | Intelligent Digital Twin (AI/ML anomaly detection) | ✅ Complete | 152/152 |
 | 6 | v0.6.0-beta | Demonstration Layer (OTFS waveform, navigation, fleet dashboard) | ✅ Complete | 281/281 |
 | 7 | v1.0.0 | LEO Constellation Operations Suite | ✅ Complete | 674 passed, 1 skipped |
+| 8 | v0.8.0-beta | MOS Completeness (command path, CCSDS receive chain, Avro schema registry) | ✅ Complete | 1110 passed, 4 skipped |
 
 ---
 
@@ -203,6 +204,26 @@ with Svalbard and Fairbanks among its stations). See ADR-020.
 
 ---
 
+## Sprint 8 — MOS Completeness (Complete)
+
+Closes the gaps against the LEO MOS architecture study guide: a controlled command path, a realistic receive chain and a shared serialisation contract. 60 of 60 story points delivered.
+
+| Story | Deliverable | Location | Notes |
+|---|---|---|---|
+| S8-03, S8-04 | Command authoring, catalogue, lifecycle state machine | `services/command/` | Human-only approval; immutable commands with audit trail |
+| S8-05 | Idempotent submission, claim-before-send uplink guard | `services/command/store.py`, `service.py` | Effectively-once (ADR-021) |
+| S8-06 | Simulator command receiver, uplink bridge | `services/satellite_simulator/command_receiver.py`, `services/command/uplink_bridge.py` | Satellite-side duplicate guard |
+| S8-08 | Token authentication, roles, security audit log | `services/command/auth.py`, `secure_service.py` | PBKDF2, lockout, expiry |
+| S8-09 | ADR-021 command path design | `docs/adr/ADR-021-command-path-design.md` | |
+| S8-07 | CCSDS Space Packet and TM Transfer Frame receive chain | `services/frame_processor/` | 85 tests; ADR-022 |
+| S8-01, S8-02 | Avro schemas, schema registry, compatibility rules | `services/schema_registry/`, `shared/schemas/avro/` | 205 tests; ADR-022 |
+
+**Sprint 8 added 436 passing tests** (674 at the end of Sprint 7, 1110 now).
+
+**Deferred from Sprint 8** (recorded in ADR-021 and ADR-022): command REST endpoints and Kafka topics, Kafka publication of decoded frames, persistent command store and persistent registry, an Avro form for the Command schema, moving the Kafka producer and consumer from JSON to the Avro serialiser.
+
+---
+
 ## Risk register
 
 | ID | Risk | Likelihood | Impact | Status | Mitigation |
@@ -248,8 +269,9 @@ with Svalbard and Fairbanks among its stations). See ADR-020.
 | ADR-019 | Azure as cloud deployment platform | 9 | Planned |
 | ADR-020 | ILP ground station scheduler | 7 | ✅ Accepted |
 | ADR-021 | Command path: approval chain, effectively-once delivery, authentication | 8 | ✅ Accepted |
+| ADR-022 | Telemetry contract: CCSDS receive chain and Avro schema registry | 8 | ✅ Accepted |
 
-All ADRs 001–018 and ADR-021 include academic citations.
+All ADRs 001–018, ADR-021 and ADR-022 include academic citations.
 
 ---
 

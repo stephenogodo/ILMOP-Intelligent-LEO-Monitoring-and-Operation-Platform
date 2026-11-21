@@ -1,10 +1,10 @@
 # ILMOP — Intelligent LEO Monitoring and Operation Platform
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-v0.7.0--beta-blue" alt="version"/>
+  <img src="https://img.shields.io/badge/version-v0.8.0--beta-blue" alt="version"/>
   <img src="https://img.shields.io/badge/python-3.14%2B-brightgreen" alt="python"/>
-  <img src="https://img.shields.io/badge/tests-515%20passing-brightgreen" alt="tests"/>
-  <img src="https://img.shields.io/badge/sprint%207-5%20of%207%20layers%20complete-orange" alt="sprints"/>
+  <img src="https://img.shields.io/badge/tests-1110%20passing-brightgreen" alt="tests"/>
+  <img src="https://img.shields.io/badge/sprint%208-complete-orange" alt="sprints"/>
   <img src="https://img.shields.io/badge/licence-MIT-lightgrey" alt="licence"/>
 </p>
 
@@ -34,8 +34,8 @@ and 8.87 m (Lagos, 6.5°N) against a J2–J6 high-precision orbital truth
 reference. The waveform layer carries 129/129 passing tests; combined platform
 and waveform tests total **410/410 with zero warnings** through Sprint 6.
 
-**Sprint 7 is complete.** The full suite stands at **674 passing tests**
-(1 skipped) across the platform.
+**Sprint 8 is complete.** The full suite stands at **1110 passing tests**
+(4 skipped; three of those need the optional `fastavro` package) across the platform.
 
 ## Why this project exists
 
@@ -144,7 +144,8 @@ random-walk telemetry learns nothing operationally meaningful.
 | 4 | v0.4.0-beta | Telemetry Data Platform — API and Dashboard | ✅ Complete | 75/75 |
 | 5 | v0.5.0-beta | Intelligent Digital Twin — AI/ML | ✅ Complete | 152/152 |
 | 6 | v0.6.0-beta | Demonstration Layer — OTFS, HPOP, Fleet Dashboard | ✅ Complete | 281/281 |
-| **7** | **v1.0.0** | **LEO Constellation Operations Suite** | **⬅ In progress (5/7 layers)** | **105/—** |
+| 7 | v1.0.0 | LEO Constellation Operations Suite | ✅ Complete | 674 passed, 1 skipped |
+| **8** | **v0.8.0-beta** | **MOS Completeness — command path, CCSDS receive chain, Avro schema registry** | **✅ Complete** | **1110 passed, 4 skipped** |
 
 Full sprint scope, risk register, ADR register, and session log:
 [`docs/ILMOP_Project_Tracker.md`](docs/ILMOP_Project_Tracker.md)
@@ -230,7 +231,7 @@ pip install -r requirements.txt
 
 ```bash
 python -m pytest tests/ -v
-# Expected: 674 passed, 1 skipped (Sprints 1–7)
+# Expected: 1110 passed, 4 skipped (Sprints 1–8)
 ```
 
 ### 3. Start infrastructure
@@ -273,6 +274,7 @@ python run_demo.py --scenario 3 --speed 60  # 24 satellites, 4 planes
 | ADR-019 | Azure AKS as cloud deployment platform *(Sprint 9, planned)* |
 | ADR-020 | ILP ground station scheduler *(Sprint 7, complete)* |
 | ADR-021 | Command path: approval chain, effectively-once delivery and authentication *(Sprint 8, accepted)* |
+| ADR-022 | Telemetry contract: CCSDS receive chain and Avro schema registry *(Sprint 8, accepted)* |
 
 ---
 

@@ -1,9 +1,9 @@
 ﻿# Product Backlog & Sprint Plan
 
 **Document ID:** DOC-009  
-**Version:** 1.4  
+**Version:** 1.5  
 **Last updated:** November 2026  
-**Status:** Sprint 7 complete
+**Status:** Sprint 8 complete
 
 ---
 
@@ -145,25 +145,25 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 
 ---
 
-## Sprint 8 — MOS Completeness (planned)
+## Sprint 8 — MOS Completeness (complete)
 
 **Version:** v0.8.0-beta  
-**Status:** ⏳ Planned  
+**Status:** ✅ Complete (60 of 60 SP)  
 **Rationale:** Closes the gaps identified against the LEO MOS Architecture Study Guide so that the system deployed in Sprint 9 is complete, not one with known gaps.
 
-| ID | User story | Priority | SP | Notes |
-|----|-----------|----------|----|-------|
-| S8-01 | As a developer, I need telemetry schemas expressed as Avro or Protobuf IDL and served by a schema registry so that producers and consumers share one serialisation contract. | Must | 8 | Pydantic models remain the Python-native interface |
-| S8-02 | As a developer, I need schema versioning with backward/forward compatibility rules so that schema changes do not break existing consumers. | Must | 5 | |
-| S8-03 | As an operator, I need structured command authoring with parameter validation so that malformed commands are rejected before approval. | Must | 5 | Command path step 1 |
-| S8-04 | As an operator, I need a command approval gate (DRAFT→APPROVED→UPLINKED→CONFIRMED/FAILED) so that no command is uplinked without operator sign-off. | Must | 5 | Command path steps 2–4 |
-| S8-05 | As an operator, I need exactly-once command delivery (deduplication and idempotency keys) so that a command is never executed twice. | Must | 8 | |
-| S8-06 | As a tester, I need uplink simulation into the satellite simulator so that the full command loop can be verified end to end. | Should | 5 | |
-| S8-07 | As a ground segment engineer, I need a CCSDS frame ingestion and decommutation layer (`services/frame_processor/`) so that raw Space Packets / TM Transfer Frames are decoded into the existing telemetry schema. | Must | 13 | Bridges clean simulated telemetry and a realistic receive chain |
-| S8-08 | As a security owner, I need command authentication so that only authorised operators can author, approve, or uplink commands. | Must | 8 | Basic security scope |
-| S8-09 | As a researcher, I need an ADR for the command path design (ADR-021) so that exactly-once and approval decisions are formally recorded. | Must | 3 | |
+| ID | User story | Priority | SP | Status |
+|----|-----------|----------|----|--------|
+| S8-01 | As a developer, I need telemetry schemas expressed as Avro or Protobuf IDL and served by a schema registry so that producers and consumers share one serialisation contract. | Must | 8 | ✅ Done — Avro chosen; Telemetry and Alarm schemas generated from the Pydantic models (which remain the Python-native interface) and committed under `shared/schemas/avro/`; in-memory registry and Confluent wire format in `services/schema_registry/`; ADR-022 |
+| S8-02 | As a developer, I need schema versioning with backward/forward compatibility rules so that schema changes do not break existing consumers. | Must | 5 | ✅ Done — BACKWARD / FORWARD / FULL / NONE and transitive modes enforced at registration; writer-to-reader resolution on decode; Telemetry 2.0 → 2.1 (`orbit_type`) registered and tested both ways (205 tests across S8-01 and S8-02) |
+| S8-03 | As an operator, I need structured command authoring with parameter validation so that malformed commands are rejected before approval. | Must | 5 | ✅ Done — command catalogue and authoring validation (`services/command/`) |
+| S8-04 | As an operator, I need a command approval gate (DRAFT→APPROVED→UPLINKED→CONFIRMED/FAILED) so that no command is uplinked without operator sign-off. | Must | 5 | ✅ Done — state machine with one transition table; human-only approval; REJECTED state added |
+| S8-05 | As an operator, I need exactly-once command delivery (deduplication and idempotency keys) so that a command is never executed twice. | Must | 8 | ✅ Done — delivered as effectively-once (ADR-021): idempotency keys, claim-before-send, satellite-side duplicate guard |
+| S8-06 | As a tester, I need uplink simulation into the satellite simulator so that the full command loop can be verified end to end. | Should | 5 | ✅ Done — command receiver in the simulator and an uplink bridge |
+| S8-07 | As a ground segment engineer, I need a CCSDS frame ingestion and decommutation layer (`services/frame_processor/`) so that raw Space Packets / TM Transfer Frames are decoded into the existing telemetry schema. | Must | 13 | ✅ Done — Space Packet and TM Transfer Frame encode/decode, CRC-16, loss and duplicate handling, multi-spacecraft (85 tests); ADR-022. Channel coding, sync marker, OCF and telecommand frames not implemented |
+| S8-08 | As a security owner, I need command authentication so that only authorised operators can author, approve, or uplink commands. | Must | 8 | ✅ Done — session tokens, PBKDF2 secrets, lockout, three roles, security audit log |
+| S8-09 | As a researcher, I need an ADR for the command path design (ADR-021) so that exactly-once and approval decisions are formally recorded. | Must | 3 | ✅ Done — ADR-021 |
 
-**Sprint 8 estimate:** 60 SP
+**Sprint 8 delivered:** 60 SP. Not wired in this sprint (deferred, see ADR-021 and ADR-022): REST endpoints and Kafka topics for commands, Kafka publication of decoded frames, a persistent registry and command store.
 
 ---
 
@@ -201,5 +201,5 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 | Sprint 5 | 32 | 112 |
 | Sprint 6 | 49 | 161 |
 | Sprint 7 | 109 | 270 |
-| Sprint 8 (estimate) | 60 | — |
+| Sprint 8 | 60 | 330 |
 | Sprint 9 (estimate) | 53 | — |
