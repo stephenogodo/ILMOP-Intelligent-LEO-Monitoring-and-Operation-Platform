@@ -28,7 +28,7 @@ ROLES NEEDED
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from shared.schemas.command_schema import ActorKind, Command
 from services.command.auth import (
@@ -152,6 +152,23 @@ class SecureCommandService:
         who = self._identify(token, "uplink", Role.UPLINKER, command_id)
         result = run_uplink(self._service, command_id, receiver, who.actor)
         self._log(who.actor.name, "uplink", command_id, True, result.reason or "ok")
+        return result
+
+    def uplink_async(self, token: str, command_id: str,
+                     sender: Callable[[Command], None]) -> DispatchResult:
+        """
+        Uplink an approved command through `sender` WITHOUT waiting for the
+        satellite (for example a sender that publishes to Kafka).  Requires
+        UPLINKER.
+
+        The command is claimed (APPROVED -> UPLINKED) and sent at most once.
+        It stays UPLINKED until the satellite's acknowledgement arrives and
+        the acknowledgement listener confirms or fails it.  If the sender
+        raises, the command is marked FAILED straight away.
+        """
+        who = self._identify(token, "uplink", Role.UPLINKER, command_id)
+        result = self._service.dispatch(command_id, who.actor, sender)
+        self._log(who.actor.name, "uplink", command_id, True, result.reason or "sent")
         return result
 
     # ── Reading ───────────────────────────────────────────────────────────────

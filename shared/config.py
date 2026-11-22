@@ -44,6 +44,15 @@ class Settings(BaseSettings):
     kafka_consumer_group_sink: str = "ilmop-sink"
     kafka_consumer_group_anomaly: str = "ilmop-anomaly-detection"
     kafka_consumer_group_dashboard: str = "ilmop-dashboard"
+    # Command loop (Sprint 9): the satellite side reads uplinked commands,
+    # the ground side reads the satellite's acknowledgements.
+    kafka_consumer_group_satellite_commands: str = "ilmop-satellite-commands"
+    kafka_consumer_group_command_acks: str = "ilmop-command-acks"
+
+    # Switches the satellite-side command listener on inside the telemetry
+    # producer.  Off by default so nothing needs the command topics unless
+    # asked for.  Set COMMANDS_ENABLED=true to turn it on.
+    commands_enabled: bool = False
 
     # Format the PRODUCERS write.  Consumers always read both, so upgrade
     # every consumer first and only then set this to "avro" (ADR-022).
@@ -99,6 +108,14 @@ class Settings(BaseSettings):
     def telemetry_topic(self, satellite_id: str) -> str:
         """Return the Kafka topic name for a given satellite's telemetry."""
         return f"{self.kafka_telemetry_topic_prefix}.{satellite_id}"
+
+    def commands_topic(self, satellite_id: str, stage: str) -> str:
+        """
+        Kafka topic for one stage of the command path, e.g.
+        commands.SAT-001.uplinked (ground to satellite) or
+        commands.SAT-001.acks (satellite to ground).
+        """
+        return f"{self.kafka_commands_topic_prefix}.{satellite_id}.{stage}"
 
     def alarms_topic(self, satellite_id: str) -> str:
         """Return the Kafka topic name for a given satellite's alarms."""

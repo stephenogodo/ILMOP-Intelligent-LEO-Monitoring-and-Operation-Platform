@@ -42,7 +42,7 @@ class TelemetryProducer:
     Publishes one telemetry record per tick to the correct Kafka topic.
     """
 
-    def __init__(self, satellite_id: str | None = None):
+    def __init__(self, satellite_id: str | None = None, command_listener=None):
         self._satellite_id = satellite_id or settings.simulator_satellite_id
         self._topic        = settings.telemetry_topic(self._satellite_id)
         self._generator    = TelemetryGenerator(satellite_id=self._satellite_id)
@@ -51,8 +51,29 @@ class TelemetryProducer:
             "acks": "all",           # wait for broker acknowledgement
             "retries": 3,
         })
-        log.info("TelemetryProducer ready | satellite=%s topic=%s broker=%s",
-                 self._satellite_id, self._topic, settings.kafka_bootstrap_servers)
+        # Satellite side of the command loop (Sprint 9).  A listener can be
+        # passed in (tests do); otherwise one is built only when
+        # COMMANDS_ENABLED=true, so a default run needs no command topics.
+        self._command_listener = command_listener
+        if self._command_listener is None and settings.commands_enabled:
+            self._command_listener = self._build_command_listener()
+
+        log.info("TelemetryProducer ready | satellite=%s topic=%s broker=%s commands=%s",
+                 self._satellite_id, self._topic, settings.kafka_bootstrap_servers,
+                 self._command_listener is not None)
+
+    def _build_command_listener(self):
+        """Wire the satellite's CommandReceiver to the Kafka command topics."""
+        from services.messaging.bus import KafkaPublisher, KafkaSubscriber
+        from services.satellite_simulator.command_listener import CommandListener
+
+        subscriber = KafkaSubscriber(
+            settings.kafka_consumer_group_satellite_commands,
+            [CommandListener.uplinked_topic(self._satellite_id)],
+        )
+        # The generator owns the receiver, which shares the satellite's state.
+        return CommandListener(self._generator.command_receiver, subscriber,
+                               KafkaPublisher(), self._satellite_id)
 
     def run(self, interval_s: float | None = None):
         """
@@ -76,6 +97,15 @@ class TelemetryProducer:
                 )
                 # Poll to trigger delivery callbacks without blocking
                 self._producer.poll(0)
+
+                # Handle any commands that arrived, so their effect shows in
+                # the NEXT telemetry record.  A command problem must never
+                # stop telemetry, so errors are logged and the loop goes on.
+                if self._command_listener is not None:
+                    try:
+                        self._command_listener.drain()
+                    except Exception:
+                        log.exception("command listener failed; telemetry continues")
 
                 log.info(
                     "Published | sat=%s eclipse=%s contact=%s batt=%.1f%%",

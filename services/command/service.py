@@ -259,6 +259,39 @@ class CommandService:
             return self._require(command_id)
         return updated
 
+    # ── Step 4 (other outcome): fail ──────────────────────────────────────────
+
+    def fail(
+        self,
+        command_id: str,
+        actor: Actor,
+        reason: str,
+        now: Optional[datetime] = None,
+    ) -> Command:
+        """
+        Record that an APPROVED or UPLINKED command failed.
+
+        dispatch() already does this when the SENDER raises.  This is for
+        the other way a command can fail: the satellite's acknowledgement
+        arrives later and says it was turned away (Sprint 9, command loop
+        over Kafka).
+
+        A repeated failure (a redelivered acknowledgement) returns the
+        command unchanged instead of raising.  A command that is already
+        CONFIRMED, REJECTED or DRAFT cannot fail: lifecycle raises
+        InvalidTransitionError.
+        """
+        command = self._require(command_id)
+        if command.status is CommandStatus.FAILED:
+            return command
+
+        updated = lifecycle.fail(command, actor, reason, now)
+        # Compare-and-swap against the status we read, so a confirmation
+        # that lands a moment earlier is not overwritten.
+        if not self._store.compare_and_save(updated, command.status):
+            return self._require(command_id)
+        return updated
+
     # ── Reading ───────────────────────────────────────────────────────────────
 
     def get(self, command_id: str) -> Optional[Command]:
