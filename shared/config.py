@@ -54,6 +54,20 @@ class Settings(BaseSettings):
     # asked for.  Set COMMANDS_ENABLED=true to turn it on.
     commands_enabled: bool = False
 
+    # ── Command REST endpoints (Sprint 9, patch C) ────────────────────────────
+    # The accounts allowed to use the command endpoints, as a JSON list:
+    #   [{"name": "stephen", "secret": "...", "kind": "OPERATOR",
+    #     "roles": ["AUTHOR", "APPROVER"]},
+    #    {"name": "uplink",  "secret": "...", "kind": "SYSTEM",
+    #     "roles": ["UPLINKER"]}]
+    # Empty (the default) means NO accounts: every command endpoint then
+    # answers 503.  There are deliberately no default credentials.
+    command_accounts_json: str = ""
+
+    # Satellites whose acknowledgement topics the API listens to, comma
+    # separated.  Only used when COMMANDS_ENABLED is true.
+    command_satellites: str = "SAT-001"
+
     # Format the PRODUCERS write.  Consumers always read both, so upgrade
     # every consumer first and only then set this to "avro" (ADR-022).
     # An invalid value stops the service at start-up.

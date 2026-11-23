@@ -20,7 +20,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from shared.config import settings
 from services.api.cache import init_cache, close_cache
-from services.api.routers import health, satellites, telemetry, alarms
+from services.api.routers import health, satellites, telemetry, alarms, commands
+from services.api.command_runtime import build_runtime
 
 logging.basicConfig(
     level=logging.INFO,
@@ -50,9 +51,18 @@ async def lifespan(app: FastAPI):
 
     await init_cache(app)
 
+    # Command endpoints (Sprint 9).  None when no accounts are configured,
+    # in which case they answer 503.  A malformed COMMAND_ACCOUNTS_JSON
+    # raises here and stops start-up on purpose.
+    app.state.commands = build_runtime(settings)
+    if app.state.commands is not None:
+        app.state.commands.start_ack_thread()
+
     yield   # ← application runs here
 
     log.info("ILMOP API shutting down …")
+    if getattr(app.state, "commands", None) is not None:
+        app.state.commands.stop()
     await app.state.pool.close()
     await close_cache(app)
     log.info("Shutdown complete.")
@@ -76,7 +86,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins     = ["*"],
     allow_credentials = False,
-    allow_methods     = ["GET"],
+    allow_methods     = ["GET", "POST"],   # POST: command endpoints
     allow_headers     = ["*"],
 )
 
@@ -86,6 +96,7 @@ app.include_router(health.router)
 app.include_router(satellites.router)
 app.include_router(telemetry.router)
 app.include_router(alarms.router)
+app.include_router(commands.router)
 
 
 # ── Dev entry point ───────────────────────────────────────────────────────────
