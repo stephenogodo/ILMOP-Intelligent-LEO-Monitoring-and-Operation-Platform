@@ -75,7 +75,7 @@ I built the command path as a layer of pure logic with no network, database or K
 - **Send first, then record the uplink.** Gives at-least-once behaviour, which can transmit a command twice. For commands that are not safe to repeat, I judged a visible gap (D6) to be better than a silent duplicate.
 - **Promising exactly-once delivery.** Not achievable; stating it would be misleading. The ADR claims effectively-once and says how.
 - **Signed self-contained tokens (JWT).** Rejected for now for the revocation and key-management reasons above.
-- **A third-party authentication library or an external identity provider.** The right choice for a production deployment, and where this should go (Sprint 9 cloud work), but too heavy for this stage and not needed to prove the command logic.
+- **A third-party authentication library or an external identity provider.** The right choice for a production deployment, and where this should go (Sprint 10 cloud work), but too heavy for this stage and not needed to prove the command logic.
 - **A single role for all privileged actions.** Rejected because authoring, approving and uplinking are different judgements made by different actors, and the approval step has the extra human-only rule.
 
 ---
@@ -88,6 +88,8 @@ I built the command path as a layer of pure logic with no network, database or K
 - `SET_TELEMETRY_INTERVAL` and `REBOOT_SUBSYSTEM` only record that they ran in the simulator; the tick loop does not use the interval, and there is no real subsystem restart.
 - Lost acknowledgements (the satellite executed but the ground never heard) are not simulated.
 - Idempotency keys are never expired.
+
+**Update, 2026-11-25:** Sprint 9 wired the REST endpoints to the authenticated service and the `commands.{sat}.uplinked` and `commands.{sat}.acks` topics to the satellite and ground listeners. The decisions and the limits that remain (no acknowledgement timeout, in-memory store) are in ADR-023. The text above is left as it was written.
 
 ---
 

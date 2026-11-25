@@ -1,9 +1,9 @@
 # ILMOP — Intelligent LEO Monitoring and Operation Platform
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-v0.8.0--beta-blue" alt="version"/>
+  <img src="https://img.shields.io/badge/version-v0.9.0--beta-blue" alt="version"/>
   <img src="https://img.shields.io/badge/python-3.14%2B-brightgreen" alt="python"/>
-  <img src="https://img.shields.io/badge/tests-1110%20passing-brightgreen" alt="tests"/>
+  <img src="https://img.shields.io/badge/tests-1324%20passing-brightgreen" alt="tests"/>
   <img src="https://img.shields.io/badge/sprint%208-complete-orange" alt="sprints"/>
   <img src="https://img.shields.io/badge/licence-MIT-lightgrey" alt="licence"/>
 </p>
@@ -34,7 +34,7 @@ and 8.87 m (Lagos, 6.5°N) against a J2–J6 high-precision orbital truth
 reference. The waveform layer carries 129/129 passing tests; combined platform
 and waveform tests total **410/410 with zero warnings** through Sprint 6.
 
-**Sprint 8 is complete.** The full suite stands at **1110 passing tests**
+**Sprint 9 is complete.** The full suite stands at **1324 passing tests**
 (4 skipped; three of those need the optional `fastavro` package) across the platform.
 
 ## Why this project exists
@@ -145,7 +145,8 @@ random-walk telemetry learns nothing operationally meaningful.
 | 5 | v0.5.0-beta | Intelligent Digital Twin — AI/ML | ✅ Complete | 152/152 |
 | 6 | v0.6.0-beta | Demonstration Layer — OTFS, HPOP, Fleet Dashboard | ✅ Complete | 281/281 |
 | 7 | v0.7.0-beta | LEO Constellation Operations Suite | ✅ Complete | 674 passed, 1 skipped |
-| **8** | **v0.8.0-beta** | **Command Path, CCSDS Receive Chain and Telemetry Schema Contract** | **✅ Complete** | **1110 passed, 4 skipped** |
+| 8 | v0.8.0-beta | Command Path, CCSDS Receive Chain and Telemetry Schema Contract | ✅ Complete | 1110 passed, 4 skipped |
+| **9** | **v0.9.0-beta** | **Wiring the Command and Telemetry Paths** | **✅ Complete** | **1324 passed, 4 skipped** |
 
 Full sprint scope, risk register, ADR register, and session log:
 [`docs/ILMOP_Project_Tracker.md`](docs/ILMOP_Project_Tracker.md)
@@ -200,7 +201,7 @@ within the range limit for their orbit-class pair.
 | Cache | Redis | 7-alpine | — |
 | ML / tracking | scikit-learn + MLflow | 1.9 / 3.16 | ADR-014/015 |
 | ILP scheduler | PuLP 2.9.0 (CBC) | Sprint 7 | ADR-020 |
-| Cloud | Azure AKS + Event Hubs | Sprint 9 | ADR-019 |
+| Cloud | Azure AKS + Event Hubs | Sprint 10 | ADR-019 |
 | Testing | pytest | 9.1+ | — |
 
 ---
@@ -231,7 +232,7 @@ pip install -r requirements.txt
 
 ```bash
 python -m pytest tests/ -v
-# Expected: 1110 passed, 4 skipped (Sprints 1–8)
+# Expected: 1324 passed, 4 skipped (Sprints 1–9)
 ```
 
 ### 3. Start infrastructure
@@ -271,10 +272,11 @@ python run_demo.py --scenario 3 --speed 60  # 24 satellites, 4 planes
 | ADR-016 | LEO/HEO training data separation |
 | ADR-017 | J2+J3+J4+J5+J6 HPOP as navigation truth reference |
 | ADR-018 | Python for OTFS waveform implementation |
-| ADR-019 | Azure AKS as cloud deployment platform *(Sprint 9, planned)* |
+| ADR-019 | Azure AKS as cloud deployment platform *(Sprint 10, planned)* |
 | ADR-020 | ILP ground station scheduler *(Sprint 7, complete)* |
 | ADR-021 | Command path: approval chain, effectively-once delivery and authentication *(Sprint 8, accepted)* |
 | ADR-022 | Telemetry contract: CCSDS receive chain and Avro schema registry *(Sprint 8, accepted)* |
+| ADR-023 | Wiring the command and telemetry paths to Kafka and the API *(Sprint 9, accepted)* |
 
 ---
 

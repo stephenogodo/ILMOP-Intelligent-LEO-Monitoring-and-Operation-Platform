@@ -92,10 +92,12 @@ Sprint 8 stories S8-07 (CCSDS frame processing), S8-01 (Avro schemas and registr
 
 - No channel coding (Reed–Solomon or LDPC), no attached sync marker, no operational control field, no frame secondary header, and no telecommand frames. Only TM frames on virtual channels carrying one kind of telemetry packet.
 - The receive chain is not yet connected to Kafka: nothing publishes the decoded telemetry to a topic.
-- The registry is in memory, has no HTTP API and no authentication, and is lost on restart. Sprint 9 would replace it with the Confluent-compatible service on Azure.
+- The registry is in memory, has no HTTP API and no authentication, and is lost on restart. Sprint 10 would replace it with the Confluent-compatible service on Azure.
 - The Command schema has no Avro form yet. Its free-form parameters map needs types the codec does not support (map or a JSON string field).
 - Alarms and Telemetry are registered, but the existing Kafka producer and consumer still use JSON; moving them to the serialiser is later work.
 - Schema checks run at registration. Nothing yet checks a consumer's reader schema against the registry at start-up.
+
+**Update, 2026-11-25:** Sprint 9 connected the receive chain to Kafka (the frame ingest service) and moved the producer and consumers onto the serialiser through a dual-read migration. See ADR-023. The text above is left as it was written.
 
 ---
 

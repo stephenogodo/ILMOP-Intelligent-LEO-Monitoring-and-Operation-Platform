@@ -1,9 +1,9 @@
 ﻿# Product Backlog & Sprint Plan
 
 **Document ID:** DOC-009  
-**Version:** 1.5  
+**Version:** 1.6  
 **Last updated:** November 2026  
-**Status:** Sprint 8 complete
+**Status:** Sprint 9 complete
 
 ---
 
@@ -149,7 +149,7 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 
 **Version:** v0.8.0-beta  
 **Status:** ✅ Complete (60 of 60 SP)  
-**Rationale:** Closes the gaps identified against the LEO MOS Architecture Study Guide so that the system deployed in Sprint 9 is complete, not one with known gaps.
+**Rationale:** Closes the gaps identified against the LEO MOS Architecture Study Guide so that the system deployed in Sprint 10 is complete, not one with known gaps.
 
 | ID | User story | Priority | SP | Status |
 |----|-----------|----------|----|--------|
@@ -163,11 +163,29 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 | S8-08 | As a security owner, I need command authentication so that only authorised operators can author, approve, or uplink commands. | Must | 8 | ✅ Done — session tokens, PBKDF2 secrets, lockout, three roles, security audit log |
 | S8-09 | As a researcher, I need an ADR for the command path design (ADR-021) so that exactly-once and approval decisions are formally recorded. | Must | 3 | ✅ Done — ADR-021 |
 
-**Sprint 8 delivered:** 60 SP. Not wired in this sprint (deferred, see ADR-021 and ADR-022): REST endpoints and Kafka topics for commands, Kafka publication of decoded frames, a persistent registry and command store.
+**Sprint 8 delivered:** 60 SP. Not wired in this sprint (deferred, see ADR-021 and ADR-022, and delivered in Sprint 9 except where ADR-023 says otherwise): REST endpoints and Kafka topics for commands, Kafka publication of decoded frames, a persistent registry and command store.
 
 ---
 
-## Sprint 9 — Cloud-Native and v1.0.0 (planned, was Sprint 8)
+## Sprint 9 — Wiring the Command and Telemetry Paths (complete)
+
+**Version:** v0.9.0-beta  
+**Status:** ✅ Complete (24 of 24 SP)  
+**Rationale:** Sprint 8 built the command path, the receive chain and the schema contract as separate parts. This sprint connects them to Kafka and the API, so that the cloud sprint wraps a working system rather than unconnected parts.
+
+| ID | User story | Priority | SP | Status |
+|----|-----------|----------|----|--------|
+| S9-01 | As a developer, I need telemetry and alarms on the Kafka path to use the Avro serialiser, with JSON still the default, so that the schema contract is enforced in flight without breaking existing consumers. | Must | 5 | ✅ Done — dual-read consumers, `KAFKA_SERIALIZATION` switch for producers (ADR-023) |
+| S9-02 | As an operator, I need the command loop to run over Kafka (uplinked and acknowledgement topics) so that an approved command reaches the satellite and its answer confirms or fails the command. | Must | 8 | ✅ Done — in-memory and Kafka bus, satellite command listener, acknowledgement listener, `scripts/command_loop_kafka_check.py` |
+| S9-03 | As an operator, I need REST endpoints for the command path so that commands can be submitted, approved, uplinked and read over HTTP with token authentication. | Must | 5 | ✅ Done — login, submit, read, approve, reject, uplink; accounts from configuration; 47 tests |
+| S9-04 | As a ground segment engineer, I need a frame ingest service so that decoded CCSDS telemetry is published to the same Kafka topics as simulator telemetry. | Must | 3 | ✅ Done — simulated downlink with optional frame loss, replay from bytes, 29 tests |
+| S9-05 | As a researcher, I need ADR-023 and the renumbered plan so that the Sprint 9 decisions and their limits are formally recorded. | Must | 3 | ✅ Done — ADR-023; cloud sprint renumbered to Sprint 10 |
+
+**Sprint 9 delivered:** 24 SP and 214 new passing tests (1110 at the end of Sprint 8, 1324 now). Still open and recorded in ADR-023: an acknowledgement timeout, a persistent command store, an Avro form for the Command schema, a real antenna source for frame ingest, and a run of the Kafka wrappers against a real broker.
+
+---
+
+## Sprint 10 — Cloud-Native and v1.0.0 (planned, was Sprint 9)
 
 **Version:** v1.0.0  
 **Status:** ⏳ Planned  
@@ -175,16 +193,16 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 
 | ID | User story | Priority | SP | Notes |
 |----|-----------|----------|----|-------|
-| S9-01 | As an operator, I need Azure AKS Kubernetes manifests so that all ILMOP services can run in a cloud-native cluster. | Should | 13 | Deferred from Sprint 7 |
-| S9-02 | As an operator, I need Azure Event Hubs (Kafka-compatible) so that streaming works without an on-premises Kafka cluster. | Should | 8 | Zero code change — Kafka wire protocol |
-| S9-03 | As a data engineer, I need Azure Database for PostgreSQL Flexible Server with TimescaleDB extension so that historical telemetry persists in the cloud. | Should | 8 | |
-| S9-04 | As a security owner, I need Azure Key Vault so that secrets are held outside environment variables. | Should | 5 | |
-| S9-05 | As a researcher, I need MLflow artefacts migrated to Azure Blob Storage so that experiment artefacts are cloud-persisted. | Should | 5 | |
-| S9-06 | As a demonstrator, I need a four-scenario progressive cloud demo (Scenarios 1→4) so that the full system is shown running on Azure. | Should | 8 | |
-| S9-07 | As a researcher, I need ADR-019 (Azure platform) published so that the cloud platform decision is formally recorded. | Must | 3 | ADR-020 already published |
-| S9-08 | As a release owner, I need the v1.0.0 tag and release so that the completed platform is formally released. | Must | 3 | |
+| S10-01 | As an operator, I need Azure AKS Kubernetes manifests so that all ILMOP services can run in a cloud-native cluster. | Should | 13 | Deferred from Sprint 7 |
+| S10-02 | As an operator, I need Azure Event Hubs (Kafka-compatible) so that streaming works without an on-premises Kafka cluster. | Should | 8 | Zero code change — Kafka wire protocol |
+| S10-03 | As a data engineer, I need Azure Database for PostgreSQL Flexible Server with TimescaleDB extension so that historical telemetry persists in the cloud. | Should | 8 | |
+| S10-04 | As a security owner, I need Azure Key Vault so that secrets are held outside environment variables. | Should | 5 | |
+| S10-05 | As a researcher, I need MLflow artefacts migrated to Azure Blob Storage so that experiment artefacts are cloud-persisted. | Should | 5 | |
+| S10-06 | As a demonstrator, I need a four-scenario progressive cloud demo (Scenarios 1→4) so that the full system is shown running on Azure. | Should | 8 | |
+| S10-07 | As a researcher, I need ADR-019 (Azure platform) published so that the cloud platform decision is formally recorded. | Must | 3 | ADR-020 already published |
+| S10-08 | As a release owner, I need the v1.0.0 tag and release so that the completed platform is formally released. | Must | 3 | |
 
-**Sprint 9 estimate:** 53 SP
+**Sprint 10 estimate:** 53 SP
 
 **Sprint order rationale:** operational features first (job-search critical, time-sensitive), MOS completeness before cloud, cloud deployment last.
 
@@ -202,4 +220,5 @@ current status. Story points follow a Fibonacci scale (1, 2, 3, 5, 8, 13).
 | Sprint 6 | 49 | 161 |
 | Sprint 7 | 109 | 270 |
 | Sprint 8 | 60 | 330 |
-| Sprint 9 (estimate) | 53 | — |
+| Sprint 9 | 24 | 354 |
+| Sprint 10 (estimate) | 53 | — |

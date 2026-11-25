@@ -2,9 +2,9 @@
 
 **Project:** Intelligent LEO Monitoring and Operation Platform
 **GitHub:** github.com/stephenogodo/ILMOP-Intelligent-LEO-Monitoring-and-Operation-Platform
-**Current version:** v0.8.0-beta (Sprint 8 complete)
+**Current version:** v0.9.0-beta (Sprint 9 complete)
 **Last updated:** November 2026
-**Total tests passing:** 1110 passed, 4 skipped (3 of the skips need the optional `fastavro` package)
+**Total tests passing:** 1324 passed, 4 skipped (3 of the skips need the optional `fastavro` package)
 
 ---
 
@@ -20,6 +20,7 @@
 | 6 | v0.6.0-beta | Demonstration Layer (OTFS waveform, navigation, fleet dashboard) | ✅ Complete | 281/281 |
 | 7 | v0.7.0-beta | LEO Constellation Operations Suite | ✅ Complete | 674 passed, 1 skipped |
 | 8 | v0.8.0-beta | Command Path, CCSDS Receive Chain and Telemetry Schema Contract | ✅ Complete | 1110 passed, 4 skipped |
+| 9 | v0.9.0-beta | Wiring the Command and Telemetry Paths | ✅ Complete | 1324 passed, 4 skipped |
 
 ---
 
@@ -192,7 +193,7 @@
 |---|---|---|---|
 | 6 | Relay Coordinator | `services/scheduler/relay_coordinator.py` | ✅ Delivered; uses ISL paths from Layer 3 to route data via relay satellites |
 | 9 | Hybrid Scenario 4 | `run_demo.py` | 6 Molniya HEO (1 per plane) + 12 LEO (2 × 6); HEO training source and research scenario; ✅ Delivered |
-| 10 | Azure AKS manifests | `infrastructure/k8s/` | Moved to Sprint 8 |
+| 10 | Azure AKS manifests | `infrastructure/k8s/` | Moved to Sprint 10 |
 | 11 | ADR-019, ADR-020 | `docs/adr/` | Azure platform + ILP scheduler rationale |
 
 **Key architectural note (ILP vs contact timer):**
@@ -218,9 +219,27 @@ Closes the gaps against the LEO MOS architecture study guide: a controlled comma
 | S8-07 | CCSDS Space Packet and TM Transfer Frame receive chain | `services/frame_processor/` | 85 tests; ADR-022 |
 | S8-01, S8-02 | Avro schemas, schema registry, compatibility rules | `services/schema_registry/`, `shared/schemas/avro/` | 205 tests; ADR-022 |
 
-**Sprint 8 added 436 passing tests** (674 at the end of Sprint 7, 1110 now).
+**Sprint 8 added 436 passing tests** (674 at the end of Sprint 7, 1110 at the end of Sprint 8).
 
-**Deferred from Sprint 8** (recorded in ADR-021 and ADR-022): command REST endpoints and Kafka topics, Kafka publication of decoded frames, persistent command store and persistent registry, an Avro form for the Command schema, moving the Kafka producer and consumer from JSON to the Avro serialiser.
+**Deferred from Sprint 8** (recorded in ADR-021 and ADR-022; the first, second and last items were delivered in Sprint 9, see below): command REST endpoints and Kafka topics, Kafka publication of decoded frames, persistent command store and persistent registry, an Avro form for the Command schema, moving the Kafka producer and consumer from JSON to the Avro serialiser.
+
+---
+
+## Sprint 9 — Wiring the Command and Telemetry Paths (Complete)
+
+Connects the Sprint 8 parts to Kafka and the API. 24 of 24 story points delivered.
+
+| Story | Deliverable | Location | Notes |
+|---|---|---|---|
+| S9-01 | Avro on the Kafka telemetry and alarm path (dual-read consumers, `KAFKA_SERIALIZATION` for producers, JSON default) | `services/messaging/`, producer, consumer, sinks, detector | 51 tests; ADR-023 |
+| S9-02 | Command loop over Kafka: message bus, satellite command listener, acknowledgement listener | `services/messaging/bus.py`, `services/command/kafka_uplink.py`, `services/satellite_simulator/command_listener.py`, `scripts/command_loop_kafka_check.py` | 87 tests |
+| S9-03 | Command REST endpoints with bearer-token authentication | `services/api/routers/commands.py`, `services/api/command_runtime.py` | 47 tests; accounts from `COMMAND_ACCOUNTS_JSON` |
+| S9-04 | Frame ingest service: raw frames to `telemetry.{sat}` topics | `services/ingest/` | 29 tests; simulated downlink and replay only |
+| S9-05 | ADR-023 and renumbering (cloud sprint is now Sprint 10) | `docs/adr/ADR-023-wiring-command-and-telemetry-paths.md` | |
+
+**Sprint 9 added 214 passing tests** (1110 at the end of Sprint 8, 1324 now).
+
+**Still open after Sprint 9** (recorded in ADR-023): an acknowledgement timeout, a persistent command store and registry, an Avro form for the Command schema, a real antenna source for frame ingest, and a run of the Kafka wrappers against a real broker.
 
 ---
 
@@ -233,7 +252,7 @@ Closes the gaps against the LEO MOS architecture study guide: a controlled comma
 | R3 | ~~Kafka producer has no key — multi-satellite ordering breaks~~ | ~~High~~ | ~~Medium~~ | ✅ Closed | Fixed in Sprint 3 |
 | R4 | ~~Isolation Forest contamination=0.05 causes false alarms~~ | ~~High~~ | ~~High~~ | ✅ Closed | contamination=0.01 Sprint 5 |
 | R5 | ~~Anomaly detection trained on nominal data only~~ | ~~High~~ | ~~High~~ | ✅ Closed | Fault injection + two-layer detector Sprint 5 |
-| R6 | Azure cost overrun | Low | Medium | Open | Azure AKS deferred to Sprint 8; size for dev/test |
+| R6 | Azure cost overrun | Low | Medium | Open | Azure AKS deferred to Sprint 10; size for dev/test |
 | R7 | ~~`shared/config.py` absent; Docker networking failures~~ | ~~High~~ | ~~Medium~~ | ✅ Closed | Created Sprint 3 |
 | R8 | poliastro API version incompatibility | Medium | High | ✅ Closed | 0.7.0 API fixed Sprint 6; cowell() + ad= pattern documented |
 | R9 | SGP4 truth accuracy insufficient for navigation papers | High | High | ✅ Closed | HPOP J2–J6 truth model built Sprint 6 (ADR-017) |
@@ -266,12 +285,13 @@ Closes the gaps against the LEO MOS architecture study guide: a controlled comma
 | ADR-016 | LEO/HEO training separation | 5 | ✅ Accepted |
 | ADR-017 | HPOP navigation truth model (J2–J6) | 6 | ✅ Accepted |
 | ADR-018 | Python for OTFS waveform implementation | 5 | ✅ Accepted |
-| ADR-019 | Azure as cloud deployment platform | 9 | Planned |
+| ADR-019 | Azure as cloud deployment platform | 10 | Planned |
 | ADR-020 | ILP ground station scheduler | 7 | ✅ Accepted |
 | ADR-021 | Command path: approval chain, effectively-once delivery, authentication | 8 | ✅ Accepted |
 | ADR-022 | Telemetry contract: CCSDS receive chain and Avro schema registry | 8 | ✅ Accepted |
+| ADR-023 | Wiring the command and telemetry paths to Kafka and the API | 9 | ✅ Accepted |
 
-All ADRs 001–018, ADR-021 and ADR-022 include academic citations.
+All ADRs 001–018 and ADR-021 to ADR-023 include academic citations.
 
 ---
 
