@@ -248,6 +248,42 @@ python run_demo.py --scenario 1         # 1 satellite, real time
 python run_demo.py --scenario 3 --speed 60  # 24 satellites, 4 planes
 ```
 
+### 5. Command path and frame ingest (Sprint 9)
+
+These are off or inert until you configure them (see `.env.example` and ADR-023).
+
+**Check the command loop against a real broker.** This creates two throwaway
+topics, sends one command while the satellite is in contact and one while it is
+not, and expects CONFIRMED and FAILED:
+
+```bash
+docker compose -f infrastructure/docker-compose.yml up -d kafka   # wait ~15 s
+python -m scripts.command_loop_kafka_check                        # add --in-memory to skip Kafka
+```
+
+**Use the command endpoints.** Put `COMMANDS_ENABLED=true` and a
+`COMMAND_ACCOUNTS_JSON` line in `.env`, start the API (it also needs TimescaleDB
+and Redis running) and the telemetry producer with the same `COMMANDS_ENABLED`:
+
+```bash
+uvicorn services.api.main:app --port 8000
+python -m services.kafka_producer.producer
+```
+
+Then, with a token from `POST /auth/login` sent as `Authorization: Bearer <token>`:
+`POST /commands` (submit), `POST /commands/{id}/approve`, `POST /commands/{id}/uplink`,
+and `GET /commands/{id}` to watch it go UPLINKED then CONFIRMED or FAILED.
+Interactive documentation is at `http://localhost:8000/docs`. With no accounts
+configured every command endpoint answers 503.
+
+**Run frame ingest.** This feeds a simulated downlink through the CCSDS receive
+chain and publishes the decoded telemetry to the same `telemetry.{sat}` topics:
+
+```bash
+python -m services.ingest --once                # one tick, then print the counters
+python -m services.ingest --drop-every-n 5      # lose every 5th frame on purpose
+```
+
 ---
 
 ## Architecture Decision Records
