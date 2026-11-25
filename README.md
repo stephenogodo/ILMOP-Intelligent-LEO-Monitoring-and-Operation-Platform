@@ -262,10 +262,13 @@ python -m scripts.command_loop_kafka_check                        # add --in-mem
 ```
 
 **Use the command endpoints.** Put `COMMANDS_ENABLED=true` and a
-`COMMAND_ACCOUNTS_JSON` line in `.env`, start the API (it also needs TimescaleDB
-and Redis running) and the telemetry producer with the same `COMMANDS_ENABLED`:
+`COMMAND_ACCOUNTS_JSON` line in `.env`, create the two command topics for each
+satellite (they are not created automatically), start the API (it needs Kafka and
+TimescaleDB; Redis is optional and only disables caching) and the telemetry
+producer with the same `COMMANDS_ENABLED`:
 
 ```bash
+python -c "from confluent_kafka.admin import AdminClient, NewTopic; a=AdminClient({'bootstrap.servers':'localhost:9092'}); [f.result() for f in a.create_topics([NewTopic(t,1,1) for t in ('commands.SAT-001.uplinked','commands.SAT-001.acks')]).values()]"
 uvicorn services.api.main:app --port 8000
 python -m services.kafka_producer.producer
 ```

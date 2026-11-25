@@ -82,7 +82,8 @@ Sprint 9 connects them. This ADR records the decisions I made while doing it, an
 - There is no acknowledgement timeout. A command whose ack never arrives stays UPLINKED, and an operator must notice it.
 - Commands travel as JSON: the Command schema has no Avro form, because its free-form parameters map needs a type the codec does not support.
 - The registry is per process and not shared. Schema checks happen at registration and not at consumer start-up.
-- The Kafka classes (`KafkaPublisher`, `KafkaSubscriber`) and the command loop script were verified against a fake client and the in-memory bus, and are still to be run against a real broker.
+- The command topics (`commands.{sat}.uplinked` and `.acks`) are not created automatically in the local Docker setup, and nothing in the services creates them. Until they exist the API's listener logs an "unknown topic" warning and carries on, and it picks the topic up once it is created. `scripts/command_loop_kafka_check.py` creates its own; for the API I create them by hand (see the README).
+- The Kafka classes and the full loop were run once against a real local broker at the end of the sprint: the loop check passed both cases, frame ingest published to `telemetry.SAT-001`, and a command submitted over HTTP was uplinked, answered by the satellite process and failed by the acknowledgement listener with "no contact". Nothing has been run against a hosted broker.
 - Frame ingest has no real antenna source (UDP, serial or file tail), no channel coding and no telecommand frames.
 - There is no endpoint to list commands, and no TLS on the API.
 
