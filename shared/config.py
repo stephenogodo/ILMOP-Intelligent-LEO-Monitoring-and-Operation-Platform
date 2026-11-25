@@ -68,6 +68,15 @@ class Settings(BaseSettings):
     # separated.  Only used when COMMANDS_ENABLED is true.
     command_satellites: str = "SAT-001"
 
+    # ── Frame ingest service (Sprint 9, patch D) ──────────────────────────────
+    # Satellite name -> CCSDS spacecraft ID (SCID), comma separated:
+    #   INGEST_SATELLITE_SCIDS="SAT-001=1,SAT-002=2"
+    # A frame whose SCID is not listed is dropped and counted.
+    ingest_satellite_scids: str = "SAT-001=1"
+
+    # Bytes per transfer frame.  The sending and receiving ends must agree.
+    ingest_frame_length: int = 1115
+
     # Format the PRODUCERS write.  Consumers always read both, so upgrade
     # every consumer first and only then set this to "avro" (ADR-022).
     # An invalid value stops the service at start-up.
